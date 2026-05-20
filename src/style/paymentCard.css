@@ -1,0 +1,26 @@
+.payment-cards input, .payment-cards select {
+  padding: 12px !important;
+}
+.payment-cards .nav-pills .nav-link.active {
+  color: #303030 !important;
+  background-color: transparent !important;
+}
+.payment-cards .nav-pills .nav-link.active .payment-span div {
+  border: 3px solid #F5F5FF;
+  background-color: #ed5623 !important;
+}
+.payment-cards .nav-pills .nav-link {
+  color: #303030 !important;
+  background-color: transparent !important;
+}
+.payment-cards .nav-pills .nav-link .payment-span {
+  border: 1px solid #ed5623;
+  border-radius: 50%;
+}
+.payment-cards .nav-pills .nav-link .payment-span div {
+  width: 20px;
+  height: 20px;
+  border-radius: 50%;
+  border: 3px solid #F5F5FF;
+  background-color: #F5F5FF !important;
+}/*# sourceMappingURL=paymentCard.css.map */

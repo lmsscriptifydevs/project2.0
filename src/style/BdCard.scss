@@ -1,0 +1,147 @@
+// Business Developer card - dark theme to match provided design
+// No company logo on the card
+
+.bd-card {
+  background: linear-gradient(145deg, #1a1a1e 0%, #252530 100%);
+  border-radius: 12px;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.35);
+  overflow: hidden;
+  transition: transform 0.2s ease, box-shadow 0.2s ease;
+  border: 1px solid rgba(255, 255, 255, 0.06);
+  margin-bottom: 1.5rem;
+
+  &:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 12px 32px rgba(0, 0, 0, 0.45);
+  }
+}
+
+.bd-card-inner {
+  padding: 1.5rem;
+}
+
+.bd-card-header {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+  margin-bottom: 1.25rem;
+}
+
+.bd-card-avatar-wrap {
+  flex-shrink: 0;
+  width: 72px;
+  height: 72px;
+  border-radius: 50%;
+  padding: 3px;
+  background: #f1592a;
+  box-sizing: border-box;
+}
+
+.bd-card-avatar {
+  width: 100%;
+  height: 100%;
+  border-radius: 50%;
+  object-fit: cover;
+  display: block;
+}
+
+.bd-card-title-wrap {
+  flex: 1;
+  min-width: 0;
+}
+
+.bd-card-name {
+  font-size: 1.25rem;
+  font-weight: 700;
+  color: #fff;
+  margin: 0 0 0.25rem 0;
+  line-height: 1.3;
+}
+
+.bd-card-role {
+  font-size: 0.875rem;
+  color: rgba(255, 255, 255, 0.7);
+  margin: 0;
+}
+
+.bd-card-section {
+  margin-bottom: 1.25rem;
+}
+
+.bd-card-section-title {
+  font-size: 0.9375rem;
+  font-weight: 700;
+  color: #f1592a;
+  margin: 0 0 0.5rem 0;
+}
+
+.bd-card-summary {
+  font-size: 0.875rem;
+  color: rgba(255, 255, 255, 0.75);
+  line-height: 1.5;
+  margin: 0;
+}
+
+.bd-card-metrics {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.75rem 1.25rem;
+  margin-bottom: 1.25rem;
+}
+
+.bd-card-metric {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+  font-size: 0.8125rem;
+  color: rgba(255, 255, 255, 0.8);
+}
+
+.bd-card-metric-icon {
+  flex-shrink: 0;
+  color: #f1592a;
+  font-size: 1rem;
+}
+
+.bd-card-actions {
+  display: flex;
+  gap: 0.75rem;
+  flex-wrap: wrap;
+}
+
+.bd-card-btn {
+  flex: 1;
+  min-width: 140px;
+  padding: 0.65rem 1rem;
+  font-size: 0.875rem;
+  font-weight: 600;
+  border-radius: 8px;
+  border: none;
+  cursor: pointer;
+  transition: opacity 0.2s, transform 0.2s;
+}
+
+.bd-card-btn:hover {
+  opacity: 0.95;
+  transform: translateY(-1px);
+}
+
+.bd-card-btn-primary {
+  background: #f1592a;
+  color: #fff;
+}
+
+.bd-card-btn-secondary {
+  background: rgba(255, 255, 255, 0.1);
+  color: #fff;
+  border: 1px solid rgba(255, 255, 255, 0.25);
+}
+
+@media (max-width: 576px) {
+  .bd-card-actions {
+    flex-direction: column;
+  }
+  .bd-card-btn {
+    min-width: 100%;
+  }
+}

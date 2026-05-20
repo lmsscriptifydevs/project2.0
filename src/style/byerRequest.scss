@@ -1,0 +1,64 @@
+.byerRequest {
+    div[data-gramm=false] {
+        min-height: 100px;
+        background-color: transparent;
+        font-family: "Poppins", sans-serif !important;
+        color: #ffffff;
+    }
+    .buyercards{
+        border-left: 1.5px solid rgba(255, 255, 255, 0.06);
+    }
+    input {
+        border: none;
+        color: #ffffff !important;
+
+        &:focus {
+            box-shadow: none;
+            border: none;
+            outline: none !important;
+        }
+
+        &::placeholder {
+            color: #71717a;
+        }
+    }
+
+    textarea {
+        border: none;
+        color: #ffffff !important;
+
+        &:focus {
+            box-shadow: none;
+            border: none;
+            outline: none !important;
+        }
+
+        &::placeholder {
+            color: #71717a;
+        }
+    }
+
+    select {
+        border: none;
+        color: #a1a1aa !important;
+        text-transform: uppercase;
+
+        &:focus {
+            box-shadow: none;
+            border: none;
+            outline: none !important;
+        }
+
+    }
+ 
+}
+
+@media (max-width:768px){
+    .byerRequest {
+      
+        .buyercards{
+            border-left: none;
+            border-top: 1.5px solid rgba(255, 255, 255, 0.06);
+        }
+    }
+}

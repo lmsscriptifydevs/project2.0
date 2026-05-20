@@ -1,0 +1,94 @@
+.textearning {
+  color: #667085;
+}
+.Earnings {
+  background: #ffffff;
+  box-shadow: 0px -2px 31px 0px #0000001a;
+}
+.Paymentwhite {
+  background-color: #ffffff;
+  box-shadow: 0px -2px 31px 0px #0000001a;
+}
+.paynowbutton {
+  background: linear-gradient(0deg, #ed5623, #ed5623),
+    linear-gradient(0deg, #ed5623, #ed5623);
+  border: 2px solid #ed5623;
+  color: #ffffff;
+  width: 20%;
+}
+.methodbutton {
+  background: transparent;
+  color: #ed5623;
+  border: 2px solid #ed5623;
+  width: 30%;
+}
+
+/* Payout Method page – client design (card layout) */
+.payout-method-page .cursor-pointer {
+  cursor: pointer;
+}
+.payout-step-badge {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+.payout-step-num {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
+  background: #f16437;
+  color: #fff;
+  font-weight: 600;
+  font-size: 1rem;
+}
+.payout-step-label {
+  font-size: 1.125rem;
+  font-weight: 600;
+  color: #1a1a1a;
+}
+.payout-option-card {
+  background: #fff;
+  border: 2px solid #e5e7eb;
+  cursor: pointer;
+  transition: border-color 0.2s, box-shadow 0.2s;
+}
+.payout-option-card:hover {
+  border-color: #f16437;
+  box-shadow: 0 4px 12px rgba(241, 100, 55, 0.15);
+}
+.payout-option-card.selected {
+  border-color: #f16437;
+  box-shadow: 0 4px 12px rgba(241, 100, 55, 0.2);
+}
+.payout-option-icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+.payout-saved-card {
+  background: #f9fafb;
+  border: 1px solid #e5e7eb;
+}
+.payout-saved-icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+.payout-summary {
+  background: #f9fafb;
+  border: 1px solid #e5e7eb;
+}
+
+.payout-detail-form {
+  background: #f9fafb;
+  border: 1px solid #e5e7eb;
+}
+@media (max-width: 991px) {
+  .payout-method-row .col-lg-7,
+  .payout-method-row .col-lg-5 {
+    max-width: 100%;
+  }
+}

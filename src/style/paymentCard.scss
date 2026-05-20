@@ -1,0 +1,234 @@
+// GrapeTask Dark Theme Payment Card Styles
+$primary-orange: #f0591f;
+$main-bg: #020617;
+$card-bg: rgba(255, 255, 255, 0.02);
+$card-bg-active: rgba(255, 255, 255, 0.04);
+$pure-white: #ffffff;
+$light-gray: #d4d4d8;
+$medium-gray: #a1a1aa;
+$body-gray: #71717a;
+$dark-gray: #52525b;
+$light-border: rgba(255, 255, 255, 0.06);
+$medium-border: rgba(255, 255, 255, 0.07);
+$orange-border: rgba(240, 89, 31, 0.4);
+
+.payment-cards {
+  input, select {
+    padding: 12px !important;
+    background-color: $card-bg-active !important;
+    border-color: $light-border !important;
+    color: $pure-white !important;
+
+    &:focus {
+      background-color: $card-bg-active !important;
+      border-color: $primary-orange !important;
+      color: $pure-white !important;
+      box-shadow: 0 0 0 0.2rem rgba(240, 89, 31, 0.25) !important;
+    }
+
+    &::placeholder {
+      color: $body-gray !important;
+    }
+
+    &:disabled {
+      background-color: $card-bg !important;
+      border-color: $dark-gray !important;
+      color: $body-gray !important;
+      cursor: not-allowed;
+    }
+  }
+
+  // Form Labels
+  .form-label {
+    color: $pure-white !important;
+    font-weight: 500;
+    margin-bottom: 8px;
+  }
+
+  // Buttons
+  .btn-stepper,
+  .btn-primary {
+    background-color: $primary-orange !important;
+    border-color: $primary-orange !important;
+    color: $pure-white !important;
+    font-weight: 600;
+    padding: 10px 24px;
+    border-radius: 6px;
+    transition: all 0.3s ease;
+
+    &:hover:not(:disabled) {
+      background-color: #e04a1a !important;
+      border-color: #e04a1a !important;
+      box-shadow: 0 8px 16px rgba(240, 89, 31, 0.3);
+    }
+
+    &:disabled {
+      background-color: $dark-gray !important;
+      border-color: $dark-gray !important;
+      color: $body-gray !important;
+      cursor: not-allowed;
+      opacity: 0.6;
+    }
+  }
+
+  // Navigation Pills (Payment Method Selection)
+  .nav-pills {
+    background-color: $card-bg !important;
+    border: 1px solid $light-border !important;
+    border-radius: 12px !important;
+    padding: 12px !important;
+
+    .nav-link {
+      color: $pure-white !important;
+      background-color: transparent !important;
+      border: 1px solid $light-border !important;
+      border-radius: 8px !important;
+      padding: 12px 16px !important;
+      margin-bottom: 8px;
+      transition: all 0.3s ease;
+
+      &:hover:not(:disabled) {
+        background-color: $card-bg-active !important;
+        border-color: $primary-orange !important;
+      }
+
+      &.active {
+        color: $pure-white !important;
+        background-color: $card-bg-active !important;
+        border-color: $primary-orange !important;
+        box-shadow: inset 0 0 0 2px $orange-border;
+
+        .payment-span div {
+          background-color: $primary-orange !important;
+          border-color: $primary-orange !important;
+        }
+      }
+
+      &:disabled {
+        opacity: 0.5;
+        cursor: not-allowed;
+
+        &:hover {
+          background-color: transparent !important;
+          border-color: $light-border !important;
+        }
+      }
+
+      .payment-span {
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        width: 20px;
+        height: 20px;
+        border-radius: 50%;
+        border: 2px solid $body-gray;
+        transition: all 0.3s ease;
+
+        div {
+          width: 12px;
+          height: 12px;
+          border-radius: 50%;
+          background-color: transparent;
+          border: none;
+          transition: all 0.3s ease;
+        }
+      }
+    }
+  }
+
+  // Card Container
+  .Paymentwhite {
+    background-color: $card-bg !important;
+    border: 1px solid $light-border !important;
+    border-radius: 12px !important;
+  }
+
+  // Toast Notifications
+  .toast {
+    background-color: transparent !important;
+    border: none !important;
+    border-radius: 8px !important;
+    overflow: hidden;
+    box-shadow: 0 10px 25px rgba(0, 0, 0, 0.3) !important;
+
+    &.show {
+      opacity: 1;
+      animation: slideInRight 0.3s ease-out;
+    }
+
+    .toast-header {
+      background: linear-gradient(135deg, rgba(240, 89, 31, 0.1), rgba(59, 130, 246, 0.05));
+      border-bottom: 1px solid $orange-border;
+      color: $pure-white !important;
+
+      &.bg-success {
+        background: linear-gradient(135deg, rgba(34, 197, 94, 0.2), rgba(34, 197, 94, 0.1)) !important;
+      }
+
+      &.bg-danger {
+        background: linear-gradient(135deg, rgba(239, 68, 68, 0.2), rgba(239, 68, 68, 0.1)) !important;
+      }
+
+      &.bg-info {
+        background: linear-gradient(135deg, rgba(59, 130, 246, 0.2), rgba(59, 130, 246, 0.1)) !important;
+      }
+    }
+
+    .toast-body {
+      background-color: rgba(0, 0, 0, 0.2);
+      color: $light-gray !important;
+      padding: 12px 16px;
+      font-size: 14px;
+      line-height: 1.5;
+    }
+  }
+
+  // Animations
+  @keyframes slideInRight {
+    from {
+      transform: translateX(400px);
+      opacity: 0;
+    }
+    to {
+      transform: translateX(0);
+      opacity: 1;
+    }
+  }
+
+  // Container Backgrounds
+  .container-fluid {
+    background-color: $main-bg !important;
+    min-height: 100vh;
+  }
+
+  // Text Colors
+  .text-muted {
+    color: $body-gray !important;
+  }
+
+  // Utility Classes for Theme
+  .theme-text-primary {
+    color: $pure-white;
+  }
+
+  .theme-text-secondary {
+    color: $body-gray;
+  }
+
+  .theme-text-accent {
+    color: $primary-orange;
+  }
+
+  .theme-bg-card {
+    background-color: $card-bg;
+    border: 1px solid $light-border;
+  }
+
+  .theme-border {
+    border-color: $light-border !important;
+
+    &:focus-within {
+      border-color: $primary-orange !important;
+    }
+  }
+}

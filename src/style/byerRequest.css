@@ -1,0 +1,55 @@
+.byerRequest div[data-gramm=false] {
+  min-height: 100px;
+  background-color: white;
+  font-family: "Poppins", sans-serif !important;
+}
+.byerRequest .buyercards {
+  border-left: 1.5px solid #D4D4D4;
+}
+.byerRequest input {
+  border: none;
+  color: #333333 !important;
+}
+.byerRequest input:focus {
+  box-shadow: none;
+  border: none;
+  outline: none !important;
+}
+.byerRequest input::-moz-placeholder {
+  color: #333333;
+}
+.byerRequest input::placeholder {
+  color: #333333;
+}
+.byerRequest textarea {
+  border: none;
+  color: #333333 !important;
+}
+.byerRequest textarea:focus {
+  box-shadow: none;
+  border: none;
+  outline: none !important;
+}
+.byerRequest textarea::-moz-placeholder {
+  color: #333333;
+}
+.byerRequest textarea::placeholder {
+  color: #333333;
+}
+.byerRequest select {
+  border: none;
+  color: #667085 !important;
+  text-transform: uppercase;
+}
+.byerRequest select:focus {
+  box-shadow: none;
+  border: none;
+  outline: none !important;
+}
+
+@media (max-width: 768px) {
+  .byerRequest .buyercards {
+    border-left: none;
+    border-top: 1.5px solid #D4D4D4;
+  }
+}/*# sourceMappingURL=byerRequest.css.map */
