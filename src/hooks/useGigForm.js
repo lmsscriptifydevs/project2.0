@@ -46,14 +46,6 @@ const VALIDATION_RULES = {
       max: 'You can only add up to 10 tags' 
     } 
   },
-  requirements: {
-    min: 5,
-    max: 2000,
-    message: {
-      min: 'Requirement must be at least 5 characters long',
-      max: 'Requirement cannot exceed 2000 characters'
-    }
-  },
   images: { 
     min: 1, 
     max: 3, 
@@ -145,52 +137,16 @@ const universalDataTransformer = (inputData) => {
   };
 
   const extractRequirements = (data) => {
-    const requirements = safeJsonParse(data.requirements || data.requirement) || [];
-    // Clean each requirement - handle newlines and special characters
-    return requirements.map(req => {
-      if (typeof req === 'string') {
-        return req
-          .trim()
-          .replace(/\r\n/g, '\n')
-          .replace(/\r/g, '\n')
-          .replace(/\n{3,}/g, '\n\n')
-          .replace(/[^\S\n]+/g, ' ')
-          .substring(0, 2000);
-      }
-      return req;
-    }).filter(req => req && req.length >= 5);
+    return safeJsonParse(data.requirements || data.requirement) || [];
   };
 
   const extractFaqs = (data) => {
-    let faqs = [];
-    if (Array.isArray(data.faqs)) faqs = data.faqs;
-    else if (Array.isArray(data.faq)) faqs = data.faq;
-    else if (data.faq && typeof data.faq === 'object' && data.faq.question) {
-      faqs = [data.faq];
+    if (Array.isArray(data.faqs)) return data.faqs;
+    if (Array.isArray(data.faq)) return data.faq;
+    if (data.faq && typeof data.faq === 'object') {
+      return data.faq.question ? [data.faq] : [];
     }
-    
-    // Clean each FAQ - handle newlines and special characters
-    return faqs.map(faq => ({
-      ...faq,
-      question: faq.question
-        ? faq.question
-            .trim()
-            .replace(/\r\n/g, '\n')
-            .replace(/\r/g, '\n')
-            .replace(/\n{3,}/g, '\n\n')
-            .replace(/[^\S\n]+/g, ' ')
-            .substring(0, 500)
-        : '',
-      answer: faq.answer
-        ? faq.answer
-            .trim()
-            .replace(/\r\n/g, '\n')
-            .replace(/\r/g, '\n')
-            .replace(/\n{3,}/g, '\n\n')
-            .replace(/[^\S\n]+/g, ' ')
-            .substring(0, 2000)
-        : ''
-    })).filter(faq => faq.question && faq.answer);
+    return [];
   };
 
   const extractImages = (data) => {
@@ -491,34 +447,14 @@ export const useGigForm = (initialData = {}) => {
         break;
       }
 
-      case 3: {
-        // FAQ step - at least 1 FAQ required
-        if (!formData.faqs || !Array.isArray(formData.faqs) || formData.faqs.length === 0) {
-          errors.faqs = 'Please add at least 1 FAQ before proceeding';
-        } else {
-          // Validate each FAQ has minimum content
-          formData.faqs.forEach((faq, index) => {
-            if (!faq.question || faq.question.trim().length < 10) {
-              errors[`faq_question_${index}`] = `FAQ ${index + 1} question must be at least 10 characters`;
-            }
-            if (!faq.answer || faq.answer.trim().length < 10) {
-              errors[`faq_answer_${index}`] = `FAQ ${index + 1} answer must be at least 10 characters`;
-            }
-          });
-        }
+      case 3:
         break;
-      }
 
       case 4: {
-        // Requirements step - at least 1 requirement required
-        if (!formData.requirements || !Array.isArray(formData.requirements) || formData.requirements.length === 0) {
-          errors.requirements = 'Please add at least 1 requirement before proceeding';
-        } else {
+        if (formData.requirements && Array.isArray(formData.requirements)) {
           formData.requirements.forEach((req, index) => {
-            if (req && req.length < 5) {
-              errors[`requirement_${index}`] = `Requirement ${index + 1} must be at least 5 characters`;
-            } else if (req && req.length > 2000) {
-              errors[`requirement_${index}`] = `Requirement ${index +1} cannot exceed 2000 characters`;
+            if (req && req.length > 2000) {
+              errors[`requirement_${index}`] = `Requirement ${index + 1} cannot exceed 2000 characters`;
             }
           });
         }
@@ -590,21 +526,13 @@ export const useGigForm = (initialData = {}) => {
       }
 
       case 3:
-        // FAQ step - at least 1 FAQ required with valid content
-        if (!formData.faqs || !Array.isArray(formData.faqs) || formData.faqs.length === 0) {
-          return false;
-        }
-        return formData.faqs.every(faq => 
-          faq.question && faq.question.trim().length >= 10 && 
-          faq.answer && faq.answer.trim().length >= 10
-        );
+        return true;
 
       case 4:
-        // Requirements step - at least 1 requirement required
-        if (!formData.requirements || !Array.isArray(formData.requirements) || formData.requirements.length === 0) {
-          return false;
+        if (formData.requirements && formData.requirements.length > 0) {
+          return formData.requirements.every(req => !req || req.length <= 2000);
         }
-        return formData.requirements.every(req => req && req.length >= 5 && req.length <= 2000);
+        return true;
 
       case 5: {
         const hasValidImages = formData.images &&

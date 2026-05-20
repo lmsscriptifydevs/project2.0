@@ -5,23 +5,18 @@ import {
   Button,
   Card,
   CardContent,
+  Divider,
   Grid,
   IconButton,
   TextField,
   Typography,
   Fade
 } from '@mui/material';
-import { useState } from 'react';
-
-// Constants for validation
-const FAQ_QUESTION_MAX = 500;
-const FAQ_ANSWER_MAX = 2000;
-const FAQ_MIN_CHARS = 10;
-const FAQ_MAX_COUNT = 10;
+import { useEffect, useState } from 'react';
 
 const FAQ = ({ formData = {}, updateFormData, validationErrors = {}, isEditMode = false }) => {
   const { faqs = [] } = formData;
-   
+  
   // Theme Schema Colors
   const theme = {
     mainBg: "#020617",
@@ -42,35 +37,13 @@ const FAQ = ({ formData = {}, updateFormData, validationErrors = {}, isEditMode 
     answer: ''
   });
 
-  // Clean text - handle newlines and special characters
-  const cleanText = (text, maxLen) => {
-    return text
-      .trim()
-      .replace(/\r\n/g, '\n') // Normalize Windows newlines
-      .replace(/\r/g, '\n') // Normalize old Mac newlines
-      .replace(/\n{3,}/g, '\n\n') // Max 2 consecutive newlines
-      .replace(/[^\S\n]+/g, ' ') // Replace multiple spaces (not newlines) with single space
-      .substring(0, maxLen); // Enforce max length
-  };
-
   const handleAddFaq = () => {
-    const cleanedQuestion = cleanText(newFaq.question, FAQ_QUESTION_MAX);
-    const cleanedAnswer = cleanText(newFaq.answer, FAQ_ANSWER_MAX);
-    
-    if (cleanedQuestion && cleanedAnswer) {
-      // Check for duplicate questions
-      const isDuplicate = faqs.some(
-        faq => faq.question?.toLowerCase() === cleanedQuestion.toLowerCase()
-      );
-      
-      if (isDuplicate) {
-        return; // Don't add duplicate
-      }
-
+    if (newFaq.question.trim() && newFaq.answer.trim()) {
       const updatedFaqs = [...faqs, { 
+        ...newFaq, 
         id: Date.now(),
-        question: cleanedQuestion,
-        answer: cleanedAnswer
+        question: newFaq.question.trim(),
+        answer: newFaq.answer.trim()
       }];
       updateFormData({ faqs: updatedFaqs });
       setNewFaq({ question: '', answer: '' });
@@ -83,36 +56,10 @@ const FAQ = ({ formData = {}, updateFormData, validationErrors = {}, isEditMode 
   };
 
   const handleUpdateFaq = (index, field, value) => {
-    const maxLen = field === 'question' ? FAQ_QUESTION_MAX : FAQ_ANSWER_MAX;
-    const cleanedValue = cleanText(value, maxLen);
-    
     const updatedFaqs = faqs.map((faq, i) => 
-      i === index ? { ...faq, [field]: cleanedValue } : faq
+      i === index ? { ...faq, [field]: value } : faq
     );
     updateFormData({ faqs: updatedFaqs });
-  };
-
-  // Handle input change with max length enforcement
-  const handleQuestionChange = (e) => {
-    const value = e.target.value;
-    if (value.length <= FAQ_QUESTION_MAX + 10) {
-      setNewFaq({ ...newFaq, question: value });
-    }
-  };
-
-  const handleAnswerChange = (e) => {
-    const value = e.target.value;
-    if (value.length <= FAQ_ANSWER_MAX + 10) {
-      setNewFaq({ ...newFaq, answer: value });
-    }
-  };
-
-  // Get character count color
-  const getCharCountColor = (current, min, max) => {
-    if (current === 0) return theme.bodyGrayText;
-    if (current < min) return theme.primaryOrange;
-    if (current > max) return "#ef4444";
-    return "#4caf50";
   };
 
   // Reusable TextField Style
@@ -130,8 +77,12 @@ const FAQ = ({ formData = {}, updateFormData, validationErrors = {}, isEditMode 
   };
 
   // Character count helpers
-  const qChars = newFaq.question.trim().length;
-  const aChars = newFaq.answer.trim().length;
+  const qChars = newFaq.question.length;
+  const aChars = newFaq.answer.length;
+  const FAQ_QUESTION_MAX = 500;
+  const FAQ_ANSWER_MAX = 2000;
+  const FAQ_MIN_CHARS = 10;
+  const FAQ_MAX_COUNT = 10;
 
   return (
     <Box sx={{ bgcolor: theme.mainBg, minHeight: '100%', borderRadius: 2 }}>
@@ -151,19 +102,8 @@ const FAQ = ({ formData = {}, updateFormData, validationErrors = {}, isEditMode 
       </Box>
 
       {validationErrors.faqs && (
-        <Alert severity="error" variant="outlined" sx={{ 
-          mb: 3, 
-          color: '#ff5252', 
-          borderColor: '#ff5252', 
-          bgcolor: 'rgba(255, 82, 82, 0.05)',
-          animation: 'shake 0.5s ease-in-out',
-          '@keyframes shake': {
-            '0%, 100%': { transform: 'translateX(0)' },
-            '10%, 30%, 50%, 70%, 90%': { transform: 'translateX(-5px)' },
-            '20%, 40%, 60%, 80%': { transform: 'translateX(5px)' },
-          }
-        }}>
-          <strong>⚠️ Required:</strong> {validationErrors.faqs}
+        <Alert severity="error" variant="outlined" sx={{ mb: 3, color: '#ff5252', borderColor: '#ff5252', bgcolor: 'rgba(255, 82, 82, 0.05)' }}>
+          {validationErrors.faqs}
         </Alert>
       )}
 
@@ -187,18 +127,18 @@ const FAQ = ({ formData = {}, updateFormData, validationErrors = {}, isEditMode 
                 fullWidth
                 label={`Sawal (Question) (${qChars}/${FAQ_QUESTION_MAX}) — Min: ${FAQ_MIN_CHARS} chars`}
                 value={newFaq.question}
-                onChange={handleQuestionChange}
-                placeholder="e.g., Kya aap fast delivery provide karte hain?"
-                inputProps={{
-                  maxLength: FAQ_QUESTION_MAX + 10,
+                onChange={(e) => {
+                  if (e.target.value.length <= FAQ_QUESTION_MAX) {
+                    setNewFaq({ ...newFaq, question: e.target.value });
+                  }
                 }}
+                placeholder="e.g., Kya aap fast delivery provide karte hain?"
                 sx={textFieldStyle}
               />
-              <Typography variant="caption" sx={{ mt: 0.5, display: 'block', color: getCharCountColor(qChars, FAQ_MIN_CHARS, FAQ_QUESTION_MAX) }}>
+              <Typography variant="caption" sx={{ mt: 0.5, display: 'block', color: qChars >= FAQ_MIN_CHARS ? '#4caf50' : theme.primaryOrange }}>
                 {qChars}/{FAQ_QUESTION_MAX} characters
                 {qChars < FAQ_MIN_CHARS && <span> — Need {FAQ_MIN_CHARS - qChars} more chars</span>}
-                {qChars >= FAQ_MIN_CHARS && qChars <= FAQ_QUESTION_MAX && <span> ✓ Valid</span>}
-                {qChars > FAQ_QUESTION_MAX && <span> ⚠️ Too long!</span>}
+                {qChars >= FAQ_MIN_CHARS && <span> ✓ Min reached</span>}
               </Typography>
             </Grid>
             <Grid item xs={12}>
@@ -208,44 +148,37 @@ const FAQ = ({ formData = {}, updateFormData, validationErrors = {}, isEditMode 
                 rows={3}
                 label={`Jawab (Answer) (${aChars}/${FAQ_ANSWER_MAX}) — Min: ${FAQ_MIN_CHARS} chars`}
                 value={newFaq.answer}
-                onChange={handleAnswerChange}
-                placeholder="Apna wazeh jawab yahan likhein..."
-                inputProps={{
-                  maxLength: FAQ_ANSWER_MAX + 10,
+                onChange={(e) => {
+                  if (e.target.value.length <= FAQ_ANSWER_MAX) {
+                    setNewFaq({ ...newFaq, answer: e.target.value });
+                  }
                 }}
+                placeholder="Apna wazeh jawab yahan likhein..."
                 sx={textFieldStyle}
               />
-              <Typography variant="caption" sx={{ mt: 0.5, display: 'block', color: getCharCountColor(aChars, FAQ_MIN_CHARS, FAQ_ANSWER_MAX) }}>
+              <Typography variant="caption" sx={{ mt: 0.5, display: 'block', color: aChars >= FAQ_MIN_CHARS ? '#4caf50' : theme.primaryOrange }}>
                 {aChars}/{FAQ_ANSWER_MAX} characters
                 {aChars < FAQ_MIN_CHARS && <span> — Need {FAQ_MIN_CHARS - aChars} more chars</span>}
-                {aChars >= FAQ_MIN_CHARS && aChars <= FAQ_ANSWER_MAX && <span> ✓ Valid</span>}
-                {aChars > FAQ_ANSWER_MAX && <span> ⚠️ Too long!</span>}
+                {aChars >= FAQ_MIN_CHARS && <span> ✓ Min reached</span>}
               </Typography>
             </Grid>
             <Grid item xs={12}>
-              <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                <Button
-                  variant="contained"
-                  onClick={handleAddFaq}
-                  disabled={!newFaq.question.trim() || !newFaq.answer.trim() || qChars < FAQ_MIN_CHARS || aChars < FAQ_MIN_CHARS || faqs.length >= FAQ_MAX_COUNT}
-                  startIcon={<Add />}
-                  sx={{ 
-                    bgcolor: theme.primaryOrange, 
-                    '&:hover': { bgcolor: '#d44a19' },
-                    textTransform: 'none',
-                    fontWeight: 'bold',
-                    borderRadius: '8px',
-                    px: 4
-                  }}
-                >
-                  Add to List
-                </Button>
-                {faqs.length >= FAQ_MAX_COUNT && (
-                  <Typography variant="caption" sx={{ color: "#ef4444" }}>
-                    Maximum {FAQ_MAX_COUNT} FAQs reached
-                  </Typography>
-                )}
-              </Box>
+              <Button
+                variant="contained"
+                onClick={handleAddFaq}
+                disabled={!newFaq.question.trim() || !newFaq.answer.trim() || qChars < FAQ_MIN_CHARS || aChars < FAQ_MIN_CHARS || faqs.length >= FAQ_MAX_COUNT}
+                startIcon={<Add />}
+                sx={{ 
+                  bgcolor: theme.primaryOrange, 
+                  '&:hover': { bgcolor: '#d44a19' },
+                  textTransform: 'none',
+                  fontWeight: 'bold',
+                  borderRadius: '8px',
+                  px: 4
+                }}
+              >
+                Add to List
+              </Button>
             </Grid>
           </Grid>
         </CardContent>
@@ -275,9 +208,10 @@ const FAQ = ({ formData = {}, updateFormData, validationErrors = {}, isEditMode 
                         size="small"
                         label={`Question ${index + 1} (${(faq.question || '').length}/${FAQ_QUESTION_MAX})`}
                         value={faq.question || ''}
-                        onChange={(e) => handleUpdateFaq(index, 'question', e.target.value)}
-                        inputProps={{
-                          maxLength: FAQ_QUESTION_MAX,
+                        onChange={(e) => {
+                          if (e.target.value.length <= FAQ_QUESTION_MAX) {
+                            handleUpdateFaq(index, 'question', e.target.value);
+                          }
                         }}
                         sx={{ ...textFieldStyle, mb: 2 }}
                       />
@@ -288,9 +222,10 @@ const FAQ = ({ formData = {}, updateFormData, validationErrors = {}, isEditMode 
                         rows={2}
                         label={`Answer ${index + 1} (${(faq.answer || '').length}/${FAQ_ANSWER_MAX})`}
                         value={faq.answer || ''}
-                        onChange={(e) => handleUpdateFaq(index, 'answer', e.target.value)}
-                        inputProps={{
-                          maxLength: FAQ_ANSWER_MAX,
+                        onChange={(e) => {
+                          if (e.target.value.length <= FAQ_ANSWER_MAX) {
+                            handleUpdateFaq(index, 'answer', e.target.value);
+                          }
                         }}
                         sx={textFieldStyle}
                       />

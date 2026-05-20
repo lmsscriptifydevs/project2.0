@@ -28,7 +28,8 @@ const ChatUserProfile = () => {
     mediumGray: "var(--inbox-text-muted, #a1a1aa)",
     bodyGray: "var(--inbox-text-light, #71717a)",
     lightBorder: "var(--inbox-border, rgba(255,255,255,0.06))",
-    orangeGlow: "var(--inbox-primary-light, rgba(240, 89, 31, 0.15))"
+    orangeGlow: "var(--inbox-primary-light, rgba(240, 89, 31, 0.15))",
+    lightGray: "var(--inbox-text-muted, #a1a1aa)"
   };
 
   if (!otherUser) {

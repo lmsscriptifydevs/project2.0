@@ -7,6 +7,7 @@ import { useUserData } from "../utils/useLocalStorage";
 import { useNavigate } from "react-router-dom";
 import Navbar from "../components/Navbar";
 import Footer from "../components/Footer";
+import { HOST_API } from "../config";
 
 const DisputeCenter = () => {
     const UserData = useUserData();
@@ -26,8 +27,8 @@ const DisputeCenter = () => {
     const [attachedFile, setAttachedFile] = useState(null);
     const [fileName, setFileName] = useState("No file chosen");
 
-    // base URL for your portal
-    const BASE_URL = "https://portal.grapetask.co/api";
+    // base URL for your portal (uses local API in development)
+    const BASE_URL = (HOST_API || "https://portal.grapetask.co/api").replace(/\/$/, "");
 
     // 1. Fetch Disputes with AbortController
     useEffect(() => {
@@ -382,12 +383,18 @@ const DisputeCenter = () => {
                                                 </Badge>
                                             </td>
                                             <td className="text-center">
-                                                <button 
-                                                    className="btn btn-sm gt-btn-outline px-3 py-2 rounded-pill d-inline-flex align-items-center gap-2" 
-                                                    onClick={() => navigate(`/dispute/${d.id}`)}
-                                                >
-                                                    <FaCommentDots /> View Chat
-                                                </button>
+                                                {d.status === 'resolved' ? (
+                                                    <span className="text-muted font-13 fw-semibold d-inline-flex align-items-center gap-1" style={{ opacity: 0.65 }}>
+                                                        🔒 Closed
+                                                    </span>
+                                                ) : (
+                                                    <button 
+                                                        className="btn btn-sm gt-btn-outline px-3 py-2 rounded-pill d-inline-flex align-items-center gap-2" 
+                                                        onClick={() => navigate(`/dispute/${d.id}`)}
+                                                    >
+                                                        <FaCommentDots /> View Chat
+                                                    </button>
+                                                )}
                                             </td>
                                         </tr>
                                     )) : (

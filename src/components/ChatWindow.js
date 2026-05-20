@@ -11,6 +11,7 @@ import { AiOutlineSend, AiOutlinePaperClip, AiOutlineSmile } from "react-icons/a
 const ChatWindow = ({ conversation }) => {
   const dispatch = useDispatch();
   const [newMessage, setNewMessage] = useState("");
+  const [showWarning, setShowWarning] = useState(false);
   const messagesEndRef = useRef(null);
   const messagesContainerRef = useRef(null);
   const isInitialLoad = useRef(true);
@@ -38,12 +39,66 @@ const ChatWindow = ({ conversation }) => {
     return () => clearTimeout(timer);
   }, [conversation?.id]);
 
+  const containsContactDetails = (text) => {
+    if (!text) return false;
+    const forbiddenKeywords = [
+      'whatsapp', 'watsap', 'whtsapp', 'whats app', 'wa.me',
+      'telegram', 'skype', 'imo', 'viber', 'wechat',
+      'phone number', 'mobile number', 'contact number', 'phone no', 'mobile no',
+      'number do', 'number de', 'contact karo', 'whatsapp pr', 'whatsapp par', 'whatsapp pe',
+      'call me', 'contact me on', 'baat karein', 'direct client'
+    ];
+    const normalizedText = text.toLowerCase();
+    for (const keyword of forbiddenKeywords) {
+      if (normalizedText.includes(keyword)) return true;
+    }
+    
+    // Clean dates and currency/price/IDs to avoid false positives
+    let cleanText = normalizedText.replace(/\b\d{4}[-\/]\d{2}[-\/]\d{2}\b/g, '');
+    cleanText = cleanText.replace(/\b\d{2}[-\/]\d{2}[-\/]\d{4}\b/g, '');
+    cleanText = cleanText.replace(/[#$€£]\d+/g, '');
+    
+    const numPattern = /(?:\d[\s-]?){7,15}/;
+    if (numPattern.test(cleanText)) {
+      return true;
+    }
+    return false;
+  };
+
+  const renderMessageText = (text) => {
+    if (!text) return "";
+    const urlRegex = /(https?:\/\/[^\s]+)/g;
+    const parts = text.split(urlRegex);
+    return parts.map((part, index) => {
+      if (urlRegex.test(part)) {
+        return (
+          <a 
+            key={index} 
+            href={part} 
+            target="_blank" 
+            rel="noopener noreferrer" 
+            className="gt-clickable-link"
+            onClick={(e) => e.stopPropagation()}
+          >
+            {part}
+          </a>
+        );
+      }
+      return part;
+    });
+  };
+
   const handleSubmit = (e) => {
     e.preventDefault();
-    if (newMessage.trim()) {
+    const content = newMessage.trim();
+    if (content) {
+      if (containsContactDetails(content)) {
+        setShowWarning(true);
+        return;
+      }
       dispatch(sendMessage({
         conversationId: conversation.id,
-        content: newMessage.trim()
+        content: content
       }));
       setNewMessage("");
     }
@@ -52,7 +107,7 @@ const ChatWindow = ({ conversation }) => {
   const getMessageStatusIcon = (status) => {
     if (status === 'read') return <BsCheckAll size={16} color="#34B7F1" />;
     if (status === 'delivered') return <BsCheckAll size={16} color="var(--bodyGrayText)" />;
-    return <BsCheck size={16} color="var(--bodyGrayText)" />; // Sent
+    return <BsCheck size={16} color="var(--bodyGrayText)" />;
   };
 
   return (
@@ -84,15 +139,70 @@ const ChatWindow = ({ conversation }) => {
             {messages?.length > 0 ? (
               messages.map((message) => {
                 const isMine = message.senderId === currentUser?.id || message.sender_id === currentUser?.id || message.isMine;
+                const hasFile = message.file_path || message.filePath;
+                const fileName = message.file_name || message.fileName || "";
+                
+                const isImg = hasFile && /\.(jpg|jpeg|png|gif|webp)$/i.test(fileName);
+                const isAud = hasFile && /\.(mp3|wav|ogg|m4a|aac)$/i.test(fileName);
+                const isVideo = hasFile && /\.(mp4|webm|ogg|mov)$/i.test(fileName);
+                
+                const fileUrl = hasFile ? (message.file_path || message.filePath).startsWith("http") ? (message.file_path || message.filePath) : `https://portal.grapetask.co/storage/${message.file_path || message.filePath}` : "";
                 
                 return (
                   <div key={message.id} className={`gt-message-row ${isMine ? 'gt-message-mine' : 'gt-message-theirs'}`}>
                     <div className="gt-message-bubble">
-                      <p className="gt-message-text">{message.content}</p>
+                      {!isMine && conversation.is_group && (
+                        <span className="gt-message-sender-name">
+                          {message.sender?.fname || message.sender_name || "Member"} ({message.sender?.role || 'user'})
+                        </span>
+                      )}
+                      
+                      {message.message && (
+                        <p className="gt-message-text">{renderMessageText(message.message)}</p>
+                      )}
+                      
+                      {isImg && (
+                        <div className="gt-message-media-wrap">
+                          <img src={fileUrl} alt={fileName} className="gt-message-img" onClick={() => window.open(fileUrl, '_blank')} />
+                        </div>
+                      )}
+                      
+                      {isAud && (
+                        <div className="gt-message-audio-wrap">
+                          <audio controls className="gt-message-audio">
+                            <source src={fileUrl} type={`audio/${fileName.split('.').pop()}`} />
+                            Your browser does not support the audio.
+                          </audio>
+                        </div>
+                      )}
+                      
+                      {isVideo && (
+                        <div className="gt-message-video-wrap">
+                          <video controls className="gt-message-video">
+                            <source src={fileUrl} type={`video/${fileName.split('.').pop()}`} />
+                            Your browser does not support video.
+                          </video>
+                        </div>
+                      )}
+                      
+                      {hasFile && !isImg && !isAud && !isVideo && (
+                        <div className="gt-message-file-card">
+                          <span className="gt-file-card-icon">📁</span>
+                          <div className="gt-file-card-details">
+                            <span className="gt-file-card-name" title={fileName}>{fileName}</span>
+                            <span className="gt-file-card-size">
+                              {message.file_size ? `${(message.file_size / 1024).toFixed(1)} KB` : "Attachment"}
+                            </span>
+                          </div>
+                          <a href={fileUrl} download={fileName} target="_blank" rel="noopener noreferrer" className="gt-file-card-btn">
+                            ⬇️
+                          </a>
+                        </div>
+                      )}
                       
                       <div className="gt-message-meta">
                         <span className="gt-message-time">
-                          {message.createdAt ? new Date(message.createdAt).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }) : new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}
+                          {message.created_at ? new Date(message.created_at).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }) : new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}
                         </span>
                         {isMine && (
                           <span className="gt-message-status">
@@ -139,6 +249,25 @@ const ChatWindow = ({ conversation }) => {
           </button>
         )}
       </div>
+
+      {/* Warning Modal */}
+      {showWarning && (
+        <div className="gt-security-modal-overlay">
+          <div className="gt-security-modal">
+            <div className="gt-security-icon-wrap">⚠️</div>
+            <h3 className="gt-security-title">Contact Sharing Restricted</h3>
+            <p className="gt-security-body">
+              For security, escrow protection, and quality assurance, sharing phone numbers, WhatsApp, emails, or off-platform communication references in Roman Urdu or English is prohibited.
+            </p>
+            <div className="gt-security-alert">
+              <strong>Warning:</strong> Repeated attempts to share contact details will result in your GrapeTask account being <strong>banned / blocked</strong> permanently.
+            </div>
+            <button className="gt-security-close-btn" onClick={() => setShowWarning(false)}>
+              I Understand & Agree
+            </button>
+          </div>
+        </div>
+      )}
 
       <style>{`
         .gt-chat-window-wrapper {
@@ -361,6 +490,172 @@ const ChatWindow = ({ conversation }) => {
           cursor: default;
           transform: none;
           box-shadow: none;
+        }
+
+        /* ─── RICH BUBBLES AND MODAL STYLES ─── */
+        .gt-message-sender-name {
+          font-size: 11px;
+          font-weight: 700;
+          color: var(--inbox-primary-hover);
+          margin-bottom: 4px;
+          display: block;
+        }
+        .gt-clickable-link {
+          color: #34B7F1;
+          text-decoration: underline;
+          word-break: break-all;
+        }
+        .gt-message-mine .gt-clickable-link {
+          color: #fff;
+          text-decoration: underline;
+        }
+        .gt-message-media-wrap {
+          margin: 4px 0;
+          border-radius: 8px;
+          overflow: hidden;
+          max-height: 240px;
+          cursor: pointer;
+        }
+        .gt-message-img {
+          width: 100%;
+          max-height: 240px;
+          object-fit: cover;
+          transition: transform 0.2s;
+        }
+        .gt-message-img:hover {
+          transform: scale(1.02);
+        }
+        .gt-message-audio-wrap {
+          margin: 6px 0;
+        }
+        .gt-message-audio {
+          max-width: 100%;
+          border-radius: 8px;
+          outline: none;
+        }
+        .gt-message-video-wrap {
+          margin: 6px 0;
+          border-radius: 8px;
+          overflow: hidden;
+          max-height: 240px;
+        }
+        .gt-message-video {
+          width: 100%;
+          max-height: 240px;
+          object-fit: cover;
+        }
+        .gt-message-file-card {
+          display: flex;
+          align-items: center;
+          background: rgba(0, 0, 0, 0.05);
+          border-radius: 8px;
+          padding: 8px 12px;
+          margin: 6px 0;
+          gap: 10px;
+        }
+        .gt-message-mine .gt-message-file-card {
+          background: rgba(255, 255, 255, 0.15);
+        }
+        .gt-file-card-icon {
+          font-size: 20px;
+        }
+        .gt-file-card-details {
+          flex: 1;
+          display: flex;
+          flex-direction: column;
+          min-width: 0;
+        }
+        .gt-file-card-name {
+          font-size: 13px;
+          font-weight: 600;
+          white-space: nowrap;
+          overflow: hidden;
+          text-overflow: ellipsis;
+        }
+        .gt-file-card-size {
+          font-size: 10px;
+          opacity: 0.8;
+        }
+        .gt-file-card-btn {
+          font-size: 16px;
+          padding: 4px;
+          background: transparent;
+          border: none;
+          cursor: pointer;
+          text-decoration: none;
+        }
+
+        /* ─── SECURITY MODAL ─── */
+        .gt-security-modal-overlay {
+          position: absolute;
+          top: 0;
+          left: 0;
+          right: 0;
+          bottom: 0;
+          background: rgba(0, 0, 0, 0.65);
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          z-index: 1000;
+          backdrop-filter: blur(4px);
+          padding: 20px;
+        }
+        .gt-security-modal {
+          background: var(--inbox-surface);
+          border: 1px solid var(--inbox-border);
+          border-radius: 16px;
+          padding: 28px;
+          max-width: 420px;
+          width: 100%;
+          text-align: center;
+          box-shadow: 0 10px 25px rgba(0,0,0,0.15);
+          animation: modalAppear 0.3s ease-out;
+        }
+        @keyframes modalAppear {
+          from { transform: scale(0.9) translateY(10px); opacity: 0; }
+          to { transform: scale(1) translateY(0); opacity: 1; }
+        }
+        .gt-security-icon-wrap {
+          font-size: 40px;
+          margin-bottom: 12px;
+        }
+        .gt-security-title {
+          color: #ef4444;
+          font-size: 18px;
+          font-weight: 700;
+          margin-bottom: 10px;
+        }
+        .gt-security-body {
+          font-size: 13px;
+          color: var(--inbox-text-main);
+          line-height: 1.6;
+          margin-bottom: 16px;
+        }
+        .gt-security-alert {
+          background-color: #fef2f2;
+          border-left: 4px solid #ef4444;
+          padding: 10px 14px;
+          border-radius: 6px;
+          color: #991b1b;
+          font-size: 12px;
+          text-align: left;
+          margin-bottom: 20px;
+          line-height: 1.5;
+        }
+        .gt-security-close-btn {
+          width: 100%;
+          background: #ef4444;
+          color: white;
+          border: none;
+          padding: 12px 20px;
+          border-radius: 8px;
+          font-size: 14px;
+          font-weight: 600;
+          cursor: pointer;
+          transition: background-color 0.2s;
+        }
+        .gt-security-close-btn:hover {
+          background: #dc2626;
         }
       `}</style>
     </div>

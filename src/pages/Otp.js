@@ -17,7 +17,6 @@ const Otp = ({ formType }) => {
   const [isProcessing, setIsProcessing] = useState(false);
   const [email, setEmail] = useState('');
   const [currentSlide, setCurrentSlide] = useState(0);
-  const [isResending, setIsResending] = useState(false);
 
    // Slider Data (Same as OTP page)
   const slides = [
@@ -58,14 +57,21 @@ const Otp = ({ formType }) => {
     return () => clearInterval(timer);
   }, [slides.length]);
 
-   // Read email synchronously on mount to show it immediately on first render
-   useEffect(() => {
-     try {
-       setEmail(localStorage.getItem('otpEmail') || '');
-     } catch {
-       setEmail('');
-     }
-   }, []);
+  // PERF STARTUP: Defer localStorage read to avoid blocking render
+  useEffect(() => {
+    const readEmail = () => {
+      try {
+        setEmail(localStorage.getItem('otpEmail') || '');
+      } catch {
+        setEmail('');
+      }
+    };
+    if ('requestIdleCallback' in window) {
+      requestIdleCallback(readEmail, { timeout: 0 });
+    } else {
+      setTimeout(readEmail, 0);
+    }
+  }, []);
 
   // OTP validation
   useEffect(() => {
@@ -169,23 +175,16 @@ const Otp = ({ formType }) => {
         setErrorMessage("Email not found. Please try the process again.");
         return;
       }
-      setIsResending(true);
-      setErrorMessage("");
-      
-      // Use resend-otp endpoint for email verification (not forgot-password which is for password reset)
-      const response = await axios.post("resend-otp", { email: email });
+      const response = await axios.post("forgot-password", { email: email });
 
       if (response.data.status) {
+        setErrorMessage("");
         alert("OTP has been resent to your email.");
       } else {
-        setErrorMessage(response.data.message || "Failed to resend OTP. Please try again.");
+        setErrorMessage("Failed to resend OTP. Please try again.");
       }
     } catch (error) {
-      setErrorMessage(
-        error.response?.data?.message || "Failed to resend OTP. Please try again."
-      );
-    } finally {
-      setIsResending(false);
+      setErrorMessage("Failed to resend OTP. Please try again.");
     }
   };
 
@@ -691,8 +690,8 @@ const Otp = ({ formType }) => {
 
                 <p className="gto-resend-text">
                   Didn't receive the code?{" "}
-                  <button type="button" onClick={handleResendOtp} disabled={isResending}>
-                    {isResending ? "Sending..." : "Resend OTP"}
+                  <button type="button" onClick={handleResendOtp}>
+                    Resend OTP
                   </button>
                 </p>
               </form>

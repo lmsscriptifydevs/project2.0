@@ -275,16 +275,6 @@ const USER_ROLES = {
   BIDDER: "bidder/company representative/middleman",
   COMPANY_REP: "bidder/company representative/middleman",
   MIDDLEMAN: "bidder/company representative/middleman",
-  BD: "business developer",
-};
-
-// Normalize role to handle BD and Bidder as same
-const normalizeRole = (role) => {
-  if (!role) return null;
-  const r = role.toLowerCase().trim();
-  if (r.includes("business") && r.includes("developer")) return "bidder/company representative/middleman";
-  if (r === "bd" || r === "business developer") return "bidder/company representative/middleman";
-  return role;
 };
 
 const SESSION_CONFIG = {
@@ -545,9 +535,8 @@ const EnhancedProtectedRoute = ({
   }
 
   // PERF STARTUP: Use Redux role or deferred roleFromStorage – no sync localStorage in render
-  const rawRole = user?.role ?? roleFromStorage;
-  const role = normalizeRole(rawRole);
-  if (requiredRoles.length > 0 && rawRole && !requiredRoles.includes(rawRole) && !requiredRoles.includes(role)) {
+  const role = user?.role ?? roleFromStorage;
+  if (requiredRoles.length > 0 && role && !requiredRoles.includes(role)) {
     return <Navigate to="/unauthorized" replace />;
   }
 
@@ -1104,7 +1093,6 @@ function AppRoutes() {
                     USER_ROLES.BIDDER,
                     USER_ROLES.COMPANY_REP,
                     USER_ROLES.MIDDLEMAN,
-                    USER_ROLES.BD,
                   ]}
                 >
                   <BuyerRequest />
@@ -1187,7 +1175,6 @@ function AppRoutes() {
         USER_ROLES.BIDDER,
         USER_ROLES.COMPANY_REP,
         USER_ROLES.MIDDLEMAN,
-        USER_ROLES.BD,
       ]}
     >
       <Earning />
@@ -1204,7 +1191,6 @@ function AppRoutes() {
                     USER_ROLES.BIDDER,
                     USER_ROLES.COMPANY_REP,
                     USER_ROLES.MIDDLEMAN,
-                    USER_ROLES.BD,
                   ]}
                 >
                   <Spending />
@@ -1230,10 +1216,6 @@ function AppRoutes() {
                     USER_ROLES.FREELANCER,
                     USER_ROLES.SELLER,
                     USER_ROLES.EXPERT,
-                    USER_ROLES.BIDDER,
-                    USER_ROLES.COMPANY_REP,
-                    USER_ROLES.MIDDLEMAN,
-                    USER_ROLES.BD,
                   ]}
                 >
                   <GigStates />
@@ -1249,10 +1231,6 @@ function AppRoutes() {
                     USER_ROLES.FREELANCER,
                     USER_ROLES.SELLER,
                     USER_ROLES.EXPERT,
-                    USER_ROLES.BIDDER,
-                    USER_ROLES.COMPANY_REP,
-                    USER_ROLES.MIDDLEMAN,
-                    USER_ROLES.BD,
                   ]}
                 >
                   <GigStatsDetail />
@@ -1271,7 +1249,6 @@ function AppRoutes() {
                     USER_ROLES.BIDDER,
                     USER_ROLES.COMPANY_REP,
                     USER_ROLES.MIDDLEMAN,
-                    USER_ROLES.BD,
                   ]}
                 >
 
@@ -1299,7 +1276,6 @@ function AppRoutes() {
                     USER_ROLES.BIDDER,
                     USER_ROLES.COMPANY_REP,
                     USER_ROLES.MIDDLEMAN,
-                    USER_ROLES.BD,
                   ]}
                 >
                   <UserBuyerRequest />
@@ -1318,7 +1294,6 @@ function AppRoutes() {
                     USER_ROLES.MIDDLEMAN,
                     USER_ROLES.FREELANCER,
                     USER_ROLES.EXPERT,
-                    USER_ROLES.BD,
                   ]}
                 >
                   <BuyBids />
@@ -1335,7 +1310,6 @@ function AppRoutes() {
                     USER_ROLES.BIDDER,
                     USER_ROLES.COMPANY_REP,
                     USER_ROLES.MIDDLEMAN,
-                    USER_ROLES.BD,
                   ]}
                 >
                   <HireExpert />
@@ -1353,38 +1327,20 @@ function AppRoutes() {
             />
 
             <Route
-              path="/gigs/manage"
-              element={
-                <RoleProtectedRoute
-                  allowedRoles={[
-                    USER_ROLES.FREELANCER,
-                    USER_ROLES.EXPERT,
-                    USER_ROLES.BIDDER,
-                    USER_ROLES.COMPANY_REP,
-                    USER_ROLES.MIDDLEMAN,
-                    USER_ROLES.BD,
-                  ]}
-                >
-                  <GigsManage />
-                </RoleProtectedRoute>
-              }
-            />
+  path="/gigs/manage"
+  element={
+    <EnhancedProtectedRoute>
+      <GigsManage />
+      </EnhancedProtectedRoute>
+  }
+/>
 
             <Route
               path="/gigs/states"
               element={
-                <RoleProtectedRoute
-                  allowedRoles={[
-                    USER_ROLES.FREELANCER,
-                    USER_ROLES.EXPERT,
-                    USER_ROLES.BIDDER,
-                    USER_ROLES.COMPANY_REP,
-                    USER_ROLES.MIDDLEMAN,
-                    USER_ROLES.BD,
-                  ]}
-                >
+                <EnhancedProtectedRoute>
                   <GigStates />
-                </RoleProtectedRoute>
+                  </EnhancedProtectedRoute>
               }
             />
 
@@ -1427,38 +1383,18 @@ function AppRoutes() {
             <Route
               path="/order"
               element={
-                <RoleProtectedRoute
-                  allowedRoles={[
-                    USER_ROLES.CLIENT,
-                    USER_ROLES.BIDDER,
-                    USER_ROLES.COMPANY_REP,
-                    USER_ROLES.MIDDLEMAN,
-                    USER_ROLES.FREELANCER,
-                    USER_ROLES.EXPERT,
-                    USER_ROLES.BD,
-                  ]}
-                >
-                  <Order />
-                </RoleProtectedRoute>
+                <EnhancedProtectedRoute>
+                   <Order />
+                   </EnhancedProtectedRoute>
               }
             />
 
             <Route
               path="/order/:id"
               element={
-                <RoleProtectedRoute
-                  allowedRoles={[
-                    USER_ROLES.CLIENT,
-                    USER_ROLES.BIDDER,
-                    USER_ROLES.COMPANY_REP,
-                    USER_ROLES.MIDDLEMAN,
-                    USER_ROLES.FREELANCER,
-                    USER_ROLES.EXPERT,
-                    USER_ROLES.BD,
-                  ]}
-                >
+                <EnhancedProtectedRoute>
                   <Order />
-                </RoleProtectedRoute>
+                </EnhancedProtectedRoute>
               }
             />
 

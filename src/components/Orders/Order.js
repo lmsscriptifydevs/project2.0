@@ -87,6 +87,7 @@ const STATUS_CONFIG = {
       "expert_assigned",
       "accepted",
       "bd_revision_requested",
+      "seller_revision_requested",
       "awaiting_files",
         "pending acceptance",
     ]),
@@ -109,6 +110,8 @@ const STATUS_CONFIG = {
     "in revision": "In Revision",
     submitted_to_bd: "Submitted to BD",
     expert_assigned: "Expert Assigned",
+    bd_revision_requested: "Client Revision Request",
+    seller_revision_requested: "Revision Requested (Expert)",
 
     // Delivered tab
     delivered: "Delivered",
@@ -139,6 +142,8 @@ const STATUS_CONFIG = {
     "in revision": "bg-warning text-dark",
     submitted_to_bd: "bg-info text-dark",
     expert_assigned: "bg-primary",
+    bd_revision_requested: "bg-warning text-dark",
+    seller_revision_requested: "bg-warning text-dark",
     delivered: "bg-success",
     submitted: "bg-info text-dark",
     completed: "bg-success",
@@ -983,6 +988,22 @@ const Order = () => {
   const [disputeReason, setDisputeReason] = useState("");
   const [revisionDialogOpen, setRevisionDialogOpen] = useState(false);
   const [revisionInstructions, setRevisionInstructions] = useState("");
+  const [cancelDialogOpen, setCancelDialogOpen] = useState(false);
+  const [cancelReason, setCancelReason] = useState("");
+
+  const [extensionDialogOpen, setExtensionDialogOpen] = useState(false);
+  const [extensionDays, setExtensionDays] = useState(1);
+  const [extensionReason, setExtensionReason] = useState("");
+  const [isSubmittingExtension, setIsSubmittingExtension] = useState(false);
+
+  const [bdReviewDialogOpen, setBdReviewDialogOpen] = useState(false);
+  const [clientReasonForClient, setClientReasonForClient] = useState("");
+  const [isSubmittingBDReview, setIsSubmittingBDReview] = useState(false);
+
+  const [confirmDialogOpen, setConfirmDialogOpen] = useState(false);
+  const [confirmDialogTitle, setConfirmDialogTitle] = useState("");
+  const [confirmDialogMessage, setConfirmDialogMessage] = useState("");
+  const [confirmDialogAction, setConfirmDialogAction] = useState(null);
 
 
   // Debug orders data
@@ -1021,6 +1042,28 @@ const Order = () => {
       return "Invalid Date";
     }
   }, []);
+
+  const getExtendedDueDate = useCallback((order) => {
+    const baseDateStr = order?.due_date || order?.offer?.date;
+    if (!baseDateStr) return null;
+    const baseDate = new Date(baseDateStr);
+    const extraDays = Number(order?.deadline_extended_by_days || 0);
+    if (extraDays > 0) {
+      baseDate.setDate(baseDate.getDate() + extraDays);
+    }
+    return baseDate;
+  }, []);
+
+  const formatOrderDueDate = useCallback((order) => {
+    const extendedDate = getExtendedDueDate(order);
+    return extendedDate ? formatDate(extendedDate) : "N/A";
+  }, [getExtendedDueDate, formatDate]);
+
+  const isOrderOverdue = useCallback((order) => {
+    const extendedDate = getExtendedDueDate(order);
+    if (!extendedDate) return false;
+    return extendedDate < new Date();
+  }, [getExtendedDueDate]);
 
   // Resolve order status (BD/API may put it on order, offer, or order_status)
   const getOrderStatus = useCallback((order) => {
@@ -1322,12 +1365,15 @@ const Order = () => {
     }
     setActionLoading(true);
     try {
+      const isBDForward = user?.role === "bidder/company representative/middleman" && selectedOrder.status === "bd_revision_requested";
+      const endpoint = isBDForward ? "/order/forward-revision" : "/order/request-revision";
+
       await axios.post(
-        `/order/request-revision`,
+        endpoint,
         { order_id: selectedOrder.id, revision_notes: revisionInstructions },
         { headers: { Authorization: `Bearer ${accessToken}` } },
       );
-      toast.success("Revision requested successfully!");
+      toast.success(isBDForward ? "Revision forwarded to Expert successfully!" : "Revision requested successfully!");
       setRevisionDialogOpen(false);
       setRevisionInstructions("");
       await refreshOrders();
@@ -1339,7 +1385,7 @@ const Order = () => {
     } finally {
       setActionLoading(false);
     }
-  }, [selectedOrder, revisionInstructions, accessToken]);
+  }, [selectedOrder, revisionInstructions, accessToken, user?.role]);
 
   const handleDisputeOrder = useCallback(async () => {
     if (!selectedOrder || !disputeReason.trim()) {
@@ -1364,6 +1410,194 @@ const Order = () => {
       setActionLoading(false);
     }
   }, [selectedOrder, disputeReason, accessToken]);
+
+  const handleCancelOrder = useCallback(async () => {
+    if (!selectedOrder || !cancelReason.trim()) {
+      toast.error("Please provide a reason for the cancellation");
+      return;
+    }
+    setActionLoading(true);
+    try {
+      await axios.post(
+        `/order/cancel`,
+        { order_id: selectedOrder.id, cancel_reason: cancelReason },
+        { headers: { Authorization: `Bearer ${accessToken}` } },
+      );
+      toast.success("Cancellation request submitted successfully!");
+      setCancelDialogOpen(false);
+      setCancelReason("");
+      await refreshOrders();
+      window.location.href = "/help";
+    } catch (error) {
+      console.error("Error requesting cancellation:", error);
+      toast.error(error.response?.data?.message || "Failed to request cancellation");
+    } finally {
+      setActionLoading(false);
+    }
+  }, [selectedOrder, cancelReason, accessToken, refreshOrders]);
+
+  const handleExtensionSubmit = useCallback(async () => {
+    if (!selectedOrder || !extensionReason) {
+      toast.error("Please provide a reason for the extension.");
+      return;
+    }
+    setIsSubmittingExtension(true);
+    try {
+      const payload = {
+        order_id: selectedOrder.id,
+        extra_days: Number(extensionDays),
+        reason: extensionReason,
+      };
+      await axios.post(`/order/deadline-extension/request`, payload, {
+        headers: { Authorization: `Bearer ${accessToken}` },
+      });
+      toast.success("Deadline extension requested successfully!");
+      setExtensionDialogOpen(false);
+      setExtensionReason("");
+      setExtensionDays(1);
+      await refreshOrders();
+    } catch (error) {
+      console.error("Error requesting deadline extension:", error);
+      toast.error(error.response?.data?.message || "Failed to request extension");
+    } finally {
+      setIsSubmittingExtension(false);
+    }
+  }, [selectedOrder, extensionDays, extensionReason, accessToken, refreshOrders]);
+
+  const handleBDSubmitForward = useCallback(async () => {
+    const extId = selectedOrder?.pending_deadline_extension?.id;
+    if (!extId) {
+      toast.error("No pending request found.");
+      return;
+    }
+    setIsSubmittingBDReview(true);
+    try {
+      await axios.post(`/order/deadline-extension/bd-approve`, {
+        extension_id: extId,
+        client_reason: clientReasonForClient,
+      }, {
+        headers: { Authorization: `Bearer ${accessToken}` },
+      });
+      toast.success("Request forwarded to client successfully!");
+      setBdReviewDialogOpen(false);
+      setClientReasonForClient("");
+      await refreshOrders();
+    } catch (error) {
+      console.error("Error forwarding extension request:", error);
+      toast.error(error.response?.data?.message || "Failed to forward request");
+    } finally {
+      setIsSubmittingBDReview(false);
+    }
+  }, [selectedOrder, clientReasonForClient, accessToken, refreshOrders]);
+
+  const handleBDRejectExtension = useCallback(() => {
+    const extId = selectedOrder?.pending_deadline_extension?.id;
+    if (!extId) {
+      toast.error("No pending request found.");
+      return;
+    }
+    const extraDays = Number(selectedOrder?.pending_deadline_extension?.extra_days || 0);
+    setConfirmDialogTitle("Reject Extension Request");
+    setConfirmDialogMessage(`Are you sure you want to reject this deadline extension request of ${extraDays} days?`);
+    setConfirmDialogAction({
+      execute: async () => {
+        setActionLoading(true);
+        try {
+          await axios.post(`/order/deadline-extension/bd-reject`, {
+            extension_id: extId,
+          }, {
+            headers: { Authorization: `Bearer ${accessToken}` },
+          });
+          toast.success("Extension request rejected successfully!");
+          handleActionMenuClose();
+          await refreshOrders();
+        } catch (error) {
+          console.error("Error rejecting extension request:", error);
+          toast.error(error.response?.data?.message || "Failed to reject request");
+        } finally {
+          setActionLoading(false);
+          setConfirmDialogOpen(false);
+        }
+      }
+    });
+    setConfirmDialogOpen(true);
+  }, [selectedOrder, accessToken, handleActionMenuClose, refreshOrders]);
+
+  const handleClientApproveExtension = useCallback(() => {
+    const extId = selectedOrder?.pending_deadline_extension?.id;
+    if (!extId) {
+      toast.error("No pending request found.");
+      return;
+    }
+
+    const extraDays = Number(selectedOrder?.pending_deadline_extension?.extra_days || 0);
+    const currentDueDate = getExtendedDueDate(selectedOrder);
+    let newDueDateStr = "N/A";
+    if (currentDueDate) {
+      const newDateObj = new Date(currentDueDate);
+      newDateObj.setDate(newDateObj.getDate() + extraDays);
+      newDueDateStr = formatDate(newDateObj);
+    }
+    const currentDueDateStr = currentDueDate ? formatDate(currentDueDate) : "N/A";
+
+    setConfirmDialogTitle("Approve Deadline Extension");
+    setConfirmDialogMessage(`Are you sure you want to approve this deadline extension? The due date will be updated from ${currentDueDateStr} to ${newDueDateStr} (extended by ${extraDays} days).`);
+    setConfirmDialogAction({
+      execute: async () => {
+        setActionLoading(true);
+        try {
+          await axios.post(`/order/deadline-extension/client-approve`, {
+            extension_id: extId,
+          }, {
+            headers: { Authorization: `Bearer ${accessToken}` },
+          });
+          toast.success("Deadline extension approved successfully!");
+          handleActionMenuClose();
+          await refreshOrders();
+        } catch (error) {
+          console.error("Error approving extension request:", error);
+          toast.error(error.response?.data?.message || "Failed to approve extension");
+        } finally {
+          setActionLoading(false);
+          setConfirmDialogOpen(false);
+        }
+      }
+    });
+    setConfirmDialogOpen(true);
+  }, [selectedOrder, accessToken, handleActionMenuClose, refreshOrders]);
+
+  const handleClientRejectExtension = useCallback(() => {
+    const extId = selectedOrder?.pending_deadline_extension?.id;
+    if (!extId) {
+      toast.error("No pending request found.");
+      return;
+    }
+    const extraDays = Number(selectedOrder?.pending_deadline_extension?.extra_days || 0);
+    setConfirmDialogTitle("Reject Deadline Extension");
+    setConfirmDialogMessage(`Are you sure you want to reject this deadline extension request of ${extraDays} days?`);
+    setConfirmDialogAction({
+      execute: async () => {
+        setActionLoading(true);
+        try {
+          await axios.post(`/order/deadline-extension/client-reject`, {
+            extension_id: extId,
+          }, {
+            headers: { Authorization: `Bearer ${accessToken}` },
+          });
+          toast.success("Deadline extension rejected successfully!");
+          handleActionMenuClose();
+          await refreshOrders();
+        } catch (error) {
+          console.error("Error rejecting extension request:", error);
+          toast.error(error.response?.data?.message || "Failed to reject extension");
+        } finally {
+          setActionLoading(false);
+          setConfirmDialogOpen(false);
+        }
+      }
+    });
+    setConfirmDialogOpen(true);
+  }, [selectedOrder, accessToken, handleActionMenuClose, refreshOrders]);
 
   const handleApproveOrder = useCallback(async () => {
     if (!selectedOrder) return;
@@ -1616,7 +1850,8 @@ const Order = () => {
       ) {
         if (!isFinished && [
           "active", "project started", "revision_requested", 
-          "in revision", "expert_assigned", "awaiting_files"
+          "in revision", "expert_assigned", "awaiting_files",
+          "seller_revision_requested"
         ].includes(orderStatus)) {
           return (
             <Button
@@ -1642,10 +1877,29 @@ const Order = () => {
 
       // 2. BD ROLE (Middleman)
       if (user?.role === "bidder/company representative/middleman") {
+        if (order.pending_deadline_extension && order.pending_deadline_extension.status === 'pending_bd') {
+          return (
+            <Button
+              variant="contained"
+              style={{ backgroundColor: "#f59e0b", color: "white" }}
+              onClick={(e) => handleActionMenuOpen(e, order)}
+              size="small"
+            >
+              Extension Request
+            </Button>
+          );
+        }
         if (orderStatus === "submitted_to_bd") {
           return (
             <Button variant="contained" color="primary" onClick={(e) => handleActionMenuOpen(e, order)} size="small">
               BD Actions
+            </Button>
+          );
+        }
+        if (orderStatus === "bd_revision_requested") {
+          return (
+            <Button variant="contained" style={{ backgroundColor: "#f59e0b", color: "white" }} onClick={(e) => handleActionMenuOpen(e, order)} size="small">
+              Forward Revision
             </Button>
           );
         }
@@ -1668,10 +1922,64 @@ const Order = () => {
 
       // 3. CLIENT ROLE (Sirf yahan "Write Review" button aayega)
       if (user?.role === "Client") {
+        if (order.pending_deadline_extension && order.pending_deadline_extension.status === 'pending_client') {
+          return (
+            <div style={{ display: "flex", gap: "8px" }}>
+              <Button
+                variant="contained"
+                style={{ backgroundColor: "#f59e0b", color: "white" }}
+                onClick={(e) => handleActionMenuOpen(e, order)}
+                size="small"
+              >
+                Extension Request
+              </Button>
+              {!isFinished && [
+                "active", "project started", "revision_requested", 
+                "in revision", "expert_assigned", "awaiting_files",
+                "bd_revision_requested", "seller_revision_requested"
+              ].includes(orderStatus) && (
+                <Button
+                  variant="outlined"
+                  color="error"
+                  onClick={() => {
+                    setSelectedOrder(order);
+                    setCancelDialogOpen(true);
+                  }}
+                  size="small"
+                  sx={{ borderRadius: "20px", fontWeight: 600 }}
+                >
+                  Cancel Order
+                </Button>
+              )}
+            </div>
+          );
+        }
+
         if (orderStatus === "delivered") {
           return (
             <Button variant="contained" color="primary" onClick={(e) => handleActionMenuOpen(e, order)} size="small">
               Actions
+            </Button>
+          );
+        }
+
+        if (!isFinished && [
+          "active", "project started", "revision_requested", 
+          "in revision", "expert_assigned", "awaiting_files",
+          "bd_revision_requested", "seller_revision_requested"
+        ].includes(orderStatus)) {
+          return (
+            <Button
+              variant="outlined"
+              color="error"
+              onClick={() => {
+                setSelectedOrder(order);
+                setCancelDialogOpen(true);
+              }}
+              size="small"
+              sx={{ borderRadius: "20px", fontWeight: 600 }}
+            >
+              Cancel Order
             </Button>
           );
         }
@@ -1810,21 +2118,17 @@ const Order = () => {
           <TableCell align="center" className="gt-text-light border-bottom-light">
             <div className="d-flex flex-column">
               <span>
-                {order?.offer?.date
-                  ? formatDate(order.offer.date)
-                  : order?.due_date
-                    ? formatDate(order.due_date)
-                    : "N/A"}
+                {formatOrderDueDate(order)}
               </span>
-              {order?.due_date && (
+              {(order?.due_date || order?.offer?.date) && (
                 <small
                   className={
-                    new Date(order.due_date) < new Date()
+                    isOrderOverdue(order)
                       ? "gt-text-danger"
                       : "gt-text-success"
                   }
                 >
-                  {new Date(order.due_date) < new Date()
+                  {isOrderOverdue(order)
                     ? "Overdue"
                     : "On time"}
                 </small>
@@ -2187,18 +2491,105 @@ const Order = () => {
         {user?.role === "expert/freelancer" ||
         user?.role === "seller" ||
         user?.role === "expert" ? (
-          <MenuItem
-            onClick={handleOpenSubmissionDialog}
-            disabled={actionLoading}
-          >
-            <FileUploadIcon fontSize="small" className="me-2" />
-            Submit Work
-          </MenuItem>
+          <>
+            <MenuItem
+              onClick={handleOpenSubmissionDialog}
+              disabled={actionLoading}
+            >
+              <FileUploadIcon fontSize="small" className="me-2" />
+              Submit Work
+            </MenuItem>
+            <MenuItem
+              onClick={() => {
+                setExtensionDialogOpen(true);
+                handleActionMenuClose();
+              }}
+              disabled={
+                actionLoading || 
+                !!selectedOrder?.pending_deadline_extension || 
+                selectedOrder?.deadline_extensions_count >= 4
+              }
+            >
+              {selectedOrder?.deadline_extensions_count >= 4 
+                ? "Request Deadline Extension (Max Limit Reached)" 
+                : selectedOrder?.pending_deadline_extension 
+                  ? "Request Deadline Extension (Pending)" 
+                  : "Request Deadline Extension"}
+            </MenuItem>
+          </>
         ) : (
           (user?.role === "Client" ||
             user?.role === "bidder/company representative/middleman") && (
             <>
               {user?.role === "bidder/company representative/middleman" &&
+              selectedOrder?.pending_deadline_extension?.status === "pending_bd" ? (
+                <>
+                  <MenuItem disabled style={{ opacity: 0.9, fontWeight: 'bold', color: '#f59e0b' }}>
+                    ⏳ Deadline Request: +{selectedOrder?.pending_deadline_extension?.extra_days} Days
+                  </MenuItem>
+                  <MenuItem disabled style={{ whiteSpace: 'normal', maxWidth: '280px', fontSize: '13px' }}>
+                    Reason: "{selectedOrder?.pending_deadline_extension?.reason}"
+                  </MenuItem>
+                  <MenuItem
+                    onClick={() => {
+                      setClientReasonForClient(selectedOrder?.pending_deadline_extension?.reason || "");
+                      setBdReviewDialogOpen(true);
+                      handleActionMenuClose();
+                    }}
+                    disabled={actionLoading}
+                    sx={{ color: '#10b981', fontWeight: 600 }}
+                  >
+                    Forward to Client
+                  </MenuItem>
+                  <MenuItem
+                    onClick={handleBDRejectExtension}
+                    disabled={actionLoading}
+                    sx={{ color: '#ef4444', fontWeight: 600 }}
+                  >
+                    Reject Extension
+                  </MenuItem>
+                </>
+              ) : user?.role === "Client" &&
+              selectedOrder?.pending_deadline_extension?.status === "pending_client" ? (
+                <>
+                  <MenuItem disabled style={{ opacity: 0.9, fontWeight: 'bold', color: '#f59e0b' }}>
+                    ⏳ Deadline Request: +{selectedOrder?.pending_deadline_extension?.extra_days} Days
+                  </MenuItem>
+                  {selectedOrder?.pending_deadline_extension?.client_reason && (
+                    <MenuItem disabled style={{ whiteSpace: 'normal', maxWidth: '280px', fontSize: '13px' }}>
+                      Reason: "{selectedOrder?.pending_deadline_extension?.client_reason}"
+                    </MenuItem>
+                  )}
+                  <MenuItem
+                    onClick={handleClientApproveExtension}
+                    disabled={actionLoading}
+                    sx={{ color: '#10b981', fontWeight: 600 }}
+                  >
+                    Approve Extension
+                  </MenuItem>
+                  <MenuItem
+                    onClick={handleClientRejectExtension}
+                    disabled={actionLoading}
+                    sx={{ color: '#ef4444', fontWeight: 600 }}
+                  >
+                    Reject Extension
+                  </MenuItem>
+                </>
+              ) : user?.role === "bidder/company representative/middleman" &&
+              selectedOrder?.status === "bd_revision_requested" ? (
+                <>
+                  <MenuItem
+                    onClick={() => {
+                      setRevisionInstructions(selectedOrder?.revision_notes || "");
+                      setRevisionDialogOpen(true);
+                      handleActionMenuClose();
+                    }}
+                    disabled={actionLoading}
+                  >
+                    Forward Revision to Expert
+                  </MenuItem>
+                </>
+              ) : user?.role === "bidder/company representative/middleman" &&
               selectedOrder?.status === "submitted_to_bd" ? (
                 <>
                   <MenuItem
@@ -2299,14 +2690,13 @@ const Order = () => {
                   <span>Due Date: </span>
                   <strong
                     className={
-                      selectedOrder.due_date &&
-                      new Date(selectedOrder.due_date) < new Date()
+                      isOrderOverdue(selectedOrder)
                         ? "text-danger"
                         : "text-success"
                     }
                   >
-                    {selectedOrder?.offer?.date ? formatDate(selectedOrder.offer.date) : "N/A"}
-{selectedOrder?.offer?.date && new Date(selectedOrder.offer.date) < new Date() && " (Overdue)"}
+                    {formatOrderDueDate(selectedOrder)}
+                    {isOrderOverdue(selectedOrder) && " (Overdue)"}
                   </strong>
                 </div>
                 {selectedOrder.description && (
@@ -2573,6 +2963,354 @@ const Order = () => {
         isSubmitting={isSubmittingReview}
         orderData={selectedOrder}
       />
+
+      {/* Cancel Order Modal */}
+      <Dialog
+        open={cancelDialogOpen}
+        onClose={() => setCancelDialogOpen(false)}
+        maxWidth="md"
+        fullWidth
+        PaperProps={{
+          sx: {
+            backgroundColor: "#020617",
+            border: "1px solid rgba(255, 255, 255, 0.07)",
+            borderRadius: "16px",
+            boxShadow: "0 24px 60px rgba(0,0,0,0.6)",
+            p: 1
+          }
+        }}
+      >
+        <DialogTitle sx={{ fontWeight: 700, color: "#f0591f", fontFamily: "Cocon, sans-serif" }}>
+          Request Order Cancellation
+        </DialogTitle>
+        <DialogContent>
+          <Typography variant="body1" sx={{ mb: 2, fontWeight: 600, color: "#ffffff" }}>
+            Are you sure you want to cancel this order?
+          </Typography>
+          <Box sx={{ 
+            background: "rgba(255, 255, 255, 0.02)", 
+            border: "1px solid rgba(255, 255, 255, 0.06)",
+            borderRadius: "12px", 
+            padding: "16px", 
+            mb: 3 
+          }}>
+            <Typography variant="body2" sx={{ color: "rgba(255, 255, 255, 0.9)", lineHeight: 1.6 }}>
+              <strong style={{ color: "#f0591f" }}>GrapeTask Cancellation Policy:</strong> Order cannot be cancelled immediately. A dispute request will be sent to GrapeTask Admin. A group discussion room will be created automatically in the <strong style={{ color: "#f0591f" }}>Dispute Center</strong> under the <strong style={{ color: "#f0591f" }}>Help</strong> page for you, the Admin, the Business Developer (BD), and the Expert to discuss the cancellation review. If all parties reach an agreement, the order will be cancelled; otherwise, our dispute resolution team will resolve it.
+            </Typography>
+          </Box>
+          <Typography variant="body2" color="error" sx={{ mb: 2, fontWeight: 600, color: "#ef4444" }}>
+            * Please provide a detailed, valid reason for cancellation:
+          </Typography>
+          <textarea
+            value={cancelReason}
+            onChange={(e) => setCancelReason(e.target.value)}
+            placeholder="Please enter a valid reason for cancellation (minimum 10 characters)..."
+            rows={4}
+            className="form-control"
+            required
+            maxLength={500}
+            style={{
+              width: "100%",
+              backgroundColor: "rgba(255, 255, 255, 0.04)",
+              border: "1px solid rgba(255, 255, 255, 0.07)",
+              borderRadius: "8px",
+              color: "#ffffff",
+              padding: "12px 14px",
+              resize: "none",
+              outline: "none",
+            }}
+            onFocus={(e) => e.target.style.borderColor = '#f0591f'}
+            onBlur={(e) => e.target.style.borderColor = 'rgba(255, 255, 255, 0.07)'}
+          />
+          <small className="text-muted" style={{ color: "rgba(255, 255, 255, 0.45)", marginTop: "4px", display: "block" }}>
+            {cancelReason.length}/500 characters (minimum 10 characters)
+          </small>
+        </DialogContent>
+        <DialogActions sx={{ px: 3, pb: 2 }}>
+          <Button
+            onClick={() => {
+              setCancelDialogOpen(false);
+              setCancelReason("");
+            }}
+            disabled={actionLoading}
+            variant="outlined"
+            sx={{ 
+              borderColor: "rgba(255, 255, 255, 0.07)", 
+              color: "#d4d4d8", 
+              "&:hover": { borderColor: "#f0591f", color: "#f0591f" } 
+            }}
+          >
+            Cancel
+          </Button>
+          <Button
+            onClick={handleCancelOrder}
+            variant="contained"
+            disabled={actionLoading || cancelReason.trim().length < 10}
+            sx={{ 
+              backgroundColor: "#f0591f", 
+              color: "#ffffff",
+              fontWeight: 600,
+              "&:hover": { backgroundColor: "#d94e18" }, 
+              "&.Mui-disabled": { backgroundColor: "rgba(240, 89, 31, 0.3)", color: "rgba(255, 255, 255, 0.3)" },
+              borderRadius: "8px" 
+            }}
+          >
+            {actionLoading ? (
+              <>
+                <CircularProgress size={20} className="me-2" style={{ color: "white" }} />
+                Submitting Request...
+              </>
+            ) : (
+              "Submit Cancellation Request"
+            )}
+          </Button>
+        </DialogActions>
+      </Dialog>
+
+      {/* Deadline Extension Modal */}
+      <Dialog
+        open={extensionDialogOpen}
+        onClose={() => setExtensionDialogOpen(false)}
+        maxWidth="sm"
+        fullWidth
+        PaperProps={{
+          sx: {
+            backgroundColor: "#020617",
+            border: "1px solid rgba(255, 255, 255, 0.07)",
+            borderRadius: "16px",
+            boxShadow: "0 24px 60px rgba(0,0,0,0.6)",
+            p: 1
+          }
+        }}
+      >
+        <DialogTitle sx={{ fontWeight: 700, color: "#f0591f", fontFamily: "Cocon, sans-serif" }}>
+          Request Deadline Extension
+        </DialogTitle>
+        <DialogContent>
+          <Typography variant="body1" sx={{ mb: 2, fontWeight: 600, color: "#ffffff" }}>
+            How many extra days do you need?
+          </Typography>
+          <input
+            type="number"
+            min="1"
+            max="30"
+            value={extensionDays}
+            onChange={(e) => setExtensionDays(e.target.value)}
+            className="form-control mb-3"
+            style={{
+              width: "100%",
+              backgroundColor: "rgba(255, 255, 255, 0.04)",
+              border: "1px solid rgba(255, 255, 255, 0.07)",
+              borderRadius: "8px",
+              color: "#ffffff",
+              padding: "12px 14px",
+              outline: "none",
+            }}
+          />
+          <Typography variant="body2" sx={{ mb: 1, fontWeight: 600, color: "#ffffff" }}>
+            * Please provide a reason for the extension:
+          </Typography>
+          <textarea
+            value={extensionReason}
+            onChange={(e) => setExtensionReason(e.target.value)}
+            placeholder="Explain why you need more time..."
+            rows={4}
+            className="form-control"
+            required
+            style={{
+              width: "100%",
+              backgroundColor: "rgba(255, 255, 255, 0.04)",
+              border: "1px solid rgba(255, 255, 255, 0.07)",
+              borderRadius: "8px",
+              color: "#ffffff",
+              padding: "12px 14px",
+              resize: "none",
+              outline: "none",
+            }}
+          />
+        </DialogContent>
+        <DialogActions sx={{ px: 3, pb: 2 }}>
+          <Button
+            onClick={() => {
+              setExtensionDialogOpen(false);
+              setExtensionReason("");
+              setExtensionDays(1);
+            }}
+            disabled={isSubmittingExtension}
+            variant="outlined"
+            sx={{ 
+              borderColor: "rgba(255, 255, 255, 0.07)", 
+              color: "#d4d4d8", 
+              "&:hover": { borderColor: "#f0591f", color: "#f0591f" } 
+            }}
+          >
+            Cancel
+          </Button>
+          <Button
+            onClick={handleExtensionSubmit}
+            variant="contained"
+            disabled={isSubmittingExtension || extensionReason.trim().length < 5}
+            sx={{ 
+              backgroundColor: "#f0591f", 
+              color: "#ffffff",
+              fontWeight: 600,
+              "&:hover": { backgroundColor: "#d94e18" }, 
+              "&.Mui-disabled": { backgroundColor: "rgba(240, 89, 31, 0.3)", color: "rgba(255, 255, 255, 0.3)" },
+              borderRadius: "8px" 
+            }}
+          >
+            {isSubmittingExtension ? (
+              <CircularProgress size={20} className="me-2" style={{ color: "white" }} />
+            ) : (
+              "Submit Request"
+            )}
+          </Button>
+        </DialogActions>
+      </Dialog>
+      
+      {/* BD Review Deadline Extension Modal */}
+      <Dialog
+        open={bdReviewDialogOpen}
+        onClose={() => setBdReviewDialogOpen(false)}
+        maxWidth="sm"
+        fullWidth
+        PaperProps={{
+          sx: {
+            backgroundColor: "#020617",
+            border: "1px solid rgba(255, 255, 255, 0.07)",
+            borderRadius: "16px",
+            boxShadow: "0 24px 60px rgba(0,0,0,0.6)",
+            p: 1
+          }
+        }}
+      >
+        <DialogTitle sx={{ fontWeight: 700, color: "#f0591f", fontFamily: "Cocon, sans-serif" }}>
+          Review Deadline Extension Request
+        </DialogTitle>
+        <DialogContent>
+          <Typography variant="body1" sx={{ mb: 2, fontWeight: 600, color: "#ffffff" }}>
+            The expert is requesting <strong>{selectedOrder?.pending_deadline_extension?.extra_days} extra days</strong>.
+          </Typography>
+          <Typography variant="body2" sx={{ mb: 2, color: "#a1a1aa", fontStyle: "italic", backgroundColor: "rgba(255, 255, 255, 0.03)", p: 2, borderRadius: "8px", borderLeft: "4px solid #f0591f" }}>
+            Expert's Reason: "{selectedOrder?.pending_deadline_extension?.reason}"
+          </Typography>
+          <Typography variant="body2" sx={{ mb: 1, fontWeight: 600, color: "#ffffff" }}>
+            Add/Modify reason to forward to Client (optional):
+          </Typography>
+          <textarea
+            value={clientReasonForClient}
+            onChange={(e) => setClientReasonForClient(e.target.value)}
+            placeholder="Customize or keep the reason to show the client..."
+            rows={4}
+            className="form-control"
+            style={{
+              width: "100%",
+              backgroundColor: "rgba(255, 255, 255, 0.04)",
+              border: "1px solid rgba(255, 255, 255, 0.07)",
+              borderRadius: "8px",
+              color: "#ffffff",
+              padding: "12px 14px",
+              resize: "none",
+              outline: "none",
+            }}
+          />
+        </DialogContent>
+        <DialogActions sx={{ px: 3, pb: 2 }}>
+          <Button
+            onClick={() => {
+              setBdReviewDialogOpen(false);
+              setClientReasonForClient("");
+            }}
+            disabled={isSubmittingBDReview}
+            variant="outlined"
+            sx={{ 
+              borderColor: "rgba(255, 255, 255, 0.07)", 
+              color: "#d4d4d8", 
+              "&:hover": { borderColor: "#f0591f", color: "#f0591f" } 
+            }}
+          >
+            Cancel
+          </Button>
+          <Button
+            onClick={handleBDSubmitForward}
+            variant="contained"
+            disabled={isSubmittingBDReview}
+            sx={{ 
+              backgroundColor: "#f0591f", 
+              color: "#ffffff",
+              fontWeight: 600,
+              "&:hover": { backgroundColor: "#d94e18" }, 
+              "&.Mui-disabled": { backgroundColor: "rgba(240, 89, 31, 0.3)", color: "rgba(255, 255, 255, 0.3)" },
+              borderRadius: "8px" 
+            }}
+          >
+            {isSubmittingBDReview ? (
+              <CircularProgress size={20} className="me-2" style={{ color: "white" }} />
+            ) : (
+              "Forward to Client"
+            )}
+          </Button>
+        </DialogActions>
+      </Dialog>
+      
+      {/* Reusable Confirm Dialog */}
+      <Dialog
+        open={confirmDialogOpen}
+        onClose={() => setConfirmDialogOpen(false)}
+        maxWidth="xs"
+        fullWidth
+        PaperProps={{
+          sx: {
+            backgroundColor: "#020617",
+            border: "1px solid rgba(255, 255, 255, 0.07)",
+            borderRadius: "16px",
+            boxShadow: "0 24px 60px rgba(0,0,0,0.6)",
+            p: 1
+          }
+        }}
+      >
+        <DialogTitle sx={{ fontWeight: 700, color: "#f0591f", fontFamily: "Cocon, sans-serif" }}>
+          {confirmDialogTitle}
+        </DialogTitle>
+        <DialogContent>
+          <Typography variant="body1" sx={{ color: "#ffffff" }}>
+            {confirmDialogMessage}
+          </Typography>
+        </DialogContent>
+        <DialogActions sx={{ px: 3, pb: 2 }}>
+          <Button
+            onClick={() => setConfirmDialogOpen(false)}
+            disabled={actionLoading}
+            variant="outlined"
+            sx={{ 
+              borderColor: "rgba(255, 255, 255, 0.07)", 
+              color: "#d4d4d8", 
+              "&:hover": { borderColor: "#f0591f", color: "#f0591f" } 
+            }}
+          >
+            Cancel
+          </Button>
+          <Button
+            onClick={() => confirmDialogAction?.execute()}
+            variant="contained"
+            disabled={actionLoading}
+            sx={{ 
+              backgroundColor: "#f0591f", 
+              color: "#ffffff",
+              fontWeight: 600,
+              "&:hover": { backgroundColor: "#d94e18" }, 
+              "&.Mui-disabled": { backgroundColor: "rgba(240, 89, 31, 0.3)", color: "rgba(255, 255, 255, 0.3)" },
+              borderRadius: "8px" 
+            }}
+          >
+            {actionLoading ? (
+              <CircularProgress size={20} className="me-2" style={{ color: "white" }} />
+            ) : (
+              "Confirm"
+            )}
+          </Button>
+        </DialogActions>
+      </Dialog>
       </div>
     </>
   );

@@ -15,9 +15,18 @@ const Chat = () => {
   const location = useLocation();
   const { selectedConversation } = useSelector((state) => state.message);
   
-  // Local state for mobile/sidebar toggles
+  // Local state for theme, mobile/sidebar toggles
+  const [themeMode, setThemeMode] = useState(() => localStorage.getItem("inboxTheme") || "dark");
   const [isMobileChatOpen, setIsMobileChatOpen] = useState(false);
   const [showProfileSidebar, setShowProfileSidebar] = useState(false);
+
+  useEffect(() => {
+    const handleThemeChange = (e) => {
+      setThemeMode(e.detail);
+    };
+    window.addEventListener('inboxThemeChanged', handleThemeChange);
+    return () => window.removeEventListener('inboxThemeChanged', handleThemeChange);
+  }, []);
 
   // Whenever a conversation is selected via Redux, open the mobile chat window
   useEffect(() => {
@@ -49,7 +58,7 @@ const Chat = () => {
   }, [dispatch]);
 
   return (
-    <div className="gt-inbox-wrapper">
+    <div className={`gt-inbox-wrapper theme-${themeMode}`}>
       <Navbar FirstNav='none' />
 
       <div className="gt-inbox-layout">
@@ -97,22 +106,40 @@ const Chat = () => {
 
       {/* 🚀 PREMIUM GRAPETASK DARK THEME CSS 🚀 */}
       <style>{`
-        :root {
+        .gt-inbox-wrapper.theme-dark {
           --inbox-bg: #020617;
           --inbox-surface: rgba(255, 255, 255, 0.02);
           --inbox-border: rgba(255, 255, 255, 0.06);
+          --inbox-border-mid: rgba(255, 255, 255, 0.07);
           --inbox-primary: #f0591f;
           --inbox-primary-hover: #d44d1a;
           --inbox-primary-light: rgba(240, 89, 31, 0.15);
           --inbox-text-main: #ffffff;
-          --inbox-text-muted: #a1a1aa;
-          --inbox-text-light: #71717a;
+          --inbox-text-muted: #d4d4d8;
+          --inbox-text-light: #a1a1aa;
+          --inbox-text-body: #71717a;
           --inbox-hover: rgba(255, 255, 255, 0.04);
+          --inbox-orange-border: rgba(240, 89, 31, 0.4);
         }
 
-        body {
-          background-color: var(--inbox-bg) !important;
-          color: var(--inbox-text-main) !important;
+        .gt-inbox-wrapper.theme-light {
+          --inbox-bg: #f8fafc;
+          --inbox-surface: #ffffff;
+          --inbox-border: #cbd5e1;
+          --inbox-border-mid: #cbd5e1;
+          --inbox-primary: #f0591f;
+          --inbox-primary-hover: #d44d1a;
+          --inbox-primary-light: rgba(240, 89, 31, 0.08);
+          --inbox-text-main: #0f172a;
+          --inbox-text-muted: #334155;
+          --inbox-text-light: #64748b;
+          --inbox-text-body: #475569;
+          --inbox-hover: rgba(15, 23, 42, 0.04);
+          --inbox-orange-border: rgba(240, 89, 31, 0.2);
+        }
+
+        .gt-inbox-wrapper, .gt-inbox-wrapper *, .gt-inbox-sidebar, .gt-inbox-main, .gt-profile-sidebar {
+          transition: background-color 0.25s ease, border-color 0.25s ease, color 0.25s ease;
         }
 
         .gt-inbox-wrapper {

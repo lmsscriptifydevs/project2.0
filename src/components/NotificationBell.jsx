@@ -1,9 +1,10 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { FaBell, FaTimes, FaCircle, FaCheckDouble, FaArrowLeft, FaBoxOpen } from "react-icons/fa";
 import { MdNotificationsActive } from "react-icons/md";
+import { HOST_API } from "../config";
 
 // ─── CONFIG ────────────────────────────────────────────────────────────────────
-const API_BASE = "https://portal.grapetask.co/api";
+const API_BASE = (HOST_API || "https://portal.grapetask.co/api").replace(/\/$/, "");
 const POLL_INTERVAL = 30000;
 const TOAST_DURATION = 6000;
 

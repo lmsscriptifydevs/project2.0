@@ -1240,7 +1240,7 @@ const UserBuyerRequest = () => {
                           </div>
                         </div>
 
-                        <div className="d-flex gap-2 mt-3 justify-content-end border-top pt-3 flex-wrap" style={{ borderColor: theme.lightBorder }}>
+                        <div className="d-flex gap-2 mt-3 justify-content-end border-top pt-3" style={{ borderColor: theme.lightBorder }}>
                           {(UserRole === "bidder/company representative/middleman" || UserRole === "bd") && (
                             <Button
                               variant="outlined"
@@ -1251,14 +1251,6 @@ const UserBuyerRequest = () => {
                               Invite Expert
                             </Button>
                           )}
-                          <Button
-                            variant="outlined"
-                            size="small"
-                            style={{ color: '#f59e0b', borderColor: 'rgba(245, 158, 11, 0.4)', textTransform: 'none', fontSize: '13px', borderRadius: '6px' }}
-                            onClick={() => toggleHold(value.id)}
-                          >
-                            Hold
-                          </Button>
                           <Button
                             variant="contained"
                             size="small"

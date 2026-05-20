@@ -478,10 +478,7 @@ export function getCategory() {
           "Content-Type": "application/json"
         }
       });
-      console.log('[CATEGORY API] Full response:', response.data);
-      const categories = response.data.categories || response.data.category || [];
-      console.log('[CATEGORY API] Parsed categories:', categories);
-      dispatch(gigSlice.actions.getuserCategory(categories));
+      dispatch(gigSlice.actions.getuserCategory(response.data.categories || []));
     } catch (error) {
       console.error("Category Error:", error);
       dispatch(gigSlice.actions.hasGetError(
@@ -502,10 +499,7 @@ export function getSubCategory() {
           "Content-Type": "application/json"
         }
       });
-      console.log('[SUBCATEGORY API] Full response:', response.data);
-      const subCategories = response.data.subCategories || response.data.sub_category || response.data.categories || [];
-      console.log('[SUBCATEGORY API] Parsed subcategories:', subCategories);
-      dispatch(gigSlice.actions.getuserSubCategory(subCategories));
+      dispatch(gigSlice.actions.getuserSubCategory(response.data.subCategories || []));
     } catch (error) {
       console.error("Subcategory Error:", error);
       dispatch(gigSlice.actions.hasGetError(

@@ -11,6 +11,22 @@ const UsersChat = () => {
   const { conversations, selectedConversation, loading } = useSelector((state) => state.message);
   const [searchQuery, setSearchQuery] = useState("");
   const [onlineUsers, setOnlineUsers] = useState({});
+  const [themeMode, setThemeMode] = useState(() => localStorage.getItem("inboxTheme") || "dark");
+
+  const toggleTheme = () => {
+    const newTheme = themeMode === "dark" ? "light" : "dark";
+    setThemeMode(newTheme);
+    localStorage.setItem("inboxTheme", newTheme);
+    window.dispatchEvent(new CustomEvent('inboxThemeChanged', { detail: newTheme }));
+  };
+
+  useEffect(() => {
+    const handleThemeChange = (e) => {
+      setThemeMode(e.detail);
+    };
+    window.addEventListener('inboxThemeChanged', handleThemeChange);
+    return () => window.removeEventListener('inboxThemeChanged', handleThemeChange);
+  }, []);
 
   // Updated to hook natively into GrapeTask Dark Theme variables
   const theme = {
@@ -35,7 +51,10 @@ const UsersChat = () => {
 
   const filteredConversations = useMemo(() => {
     if (!conversations) return [];
-    return conversations.filter((conv) => (conv.user?.fname || conv.user?.name || "").toLowerCase().includes(searchQuery.toLowerCase()));
+    return conversations.filter((conv) => {
+      const name = conv.is_group ? conv.title : (conv.user?.fname || conv.user?.name || "");
+      return name.toLowerCase().includes(searchQuery.toLowerCase());
+    });
   }, [conversations, searchQuery]);
 
   return (
@@ -44,6 +63,33 @@ const UsersChat = () => {
       {/* Title */}
       <div className="d-flex justify-content-between align-items-center mb-3">
         <h2 style={{ margin: 0, fontSize: "20px", fontWeight: "700", color: theme.pureWhite, letterSpacing: "-0.5px" }}>Chats</h2>
+        <button
+          onClick={toggleTheme}
+          style={{
+            background: themeMode === "dark" ? "rgba(255, 255, 255, 0.06)" : "rgba(0, 0, 0, 0.05)",
+            border: "1px solid var(--inbox-border, rgba(255,255,255,0.06))",
+            color: "var(--inbox-text-muted, #a1a1aa)",
+            borderRadius: "20px",
+            padding: "6px 14px",
+            cursor: "pointer",
+            transition: "all 0.2s ease",
+            fontSize: "12px",
+            fontWeight: "600",
+            letterSpacing: "0.2px"
+          }}
+          onMouseEnter={e => {
+            e.currentTarget.style.background = "var(--inbox-primary, #f0591f)";
+            e.currentTarget.style.color = "#ffffff";
+            e.currentTarget.style.borderColor = "var(--inbox-primary, #f0591f)";
+          }}
+          onMouseLeave={e => {
+            e.currentTarget.style.background = themeMode === "dark" ? "rgba(255, 255, 255, 0.06)" : "rgba(0, 0, 0, 0.05)";
+            e.currentTarget.style.color = "var(--inbox-text-muted, #a1a1aa)";
+            e.currentTarget.style.borderColor = "var(--inbox-border, rgba(255,255,255,0.06))";
+          }}
+        >
+          {themeMode === "dark" ? "Switch to Light Mode" : "Switch to Dark Mode"}
+        </button>
       </div>
 
       {/* Search Bar Section */}
@@ -91,7 +137,7 @@ const UsersChat = () => {
       )}
 
       {/* Custom Premium Scrollbar Styling */}
-      <style jsx>{`
+      <style>{`
         .custom-chat-list::-webkit-scrollbar {
           width: 4px;
         }

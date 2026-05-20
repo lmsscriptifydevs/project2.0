@@ -1,17 +1,15 @@
-import React, { useState, useRef, useEffect, useImperativeHandle, forwardRef } from 'react';
-import {
-  Box,
-  FormControl,
-  FormHelperText,
-  FormLabel,
-  Typography,
+import React, { useState, useRef } from 'react';
+import { 
+  Box, 
+  FormControl, 
+  FormHelperText, 
+  FormLabel, 
+  Typography, 
   Paper,
   IconButton,
   Popover,
   Stack,
-  Chip,
-  Snackbar,
-  Alert
+  Chip
 } from '@mui/material';
 import ReactQuill from 'react-quill';
 import EmojiPicker, { Theme as EmojiTheme } from 'emoji-picker-react';
@@ -21,30 +19,13 @@ import ShutterSpeedIcon from '@mui/icons-material/ShutterSpeed';
 // Quill styles
 import 'react-quill/dist/quill.snow.css';
 
-const MIN_CHARS = 1500;
-const MAX_CHARS = 3000;
-
-const Description = forwardRef(({ formData = {}, updateFormData, validationErrors = {}, isEditMode = false }, ref) => {
+const Description = ({ formData = {}, updateFormData, validationErrors = {}, isEditMode = false }) => {
   const [anchorEl, setAnchorEl] = useState(null);
-  const [isShaking, setIsShaking] = useState(false);
-  const [showErrorToast, setShowErrorToast] = useState(false);
   const quillRef = useRef(null);
-
+  
   const description = formData.description || '';
   const plainText = description.replace(/<[^>]*>/g, '').trim();
   const charCount = plainText.length;
-
-  // Expose shake trigger to parent
-  useImperativeHandle(ref, () => ({
-    triggerShake: () => {
-      setIsShaking(true);
-      setTimeout(() => setIsShaking(false), 600);
-    },
-    showErrorToast: () => {
-      setShowErrorToast(true);
-    },
-    getCharCount: () => charCount
-  }));
 
   // GrapeTask Dark Theme Schema
   const theme = {
@@ -62,41 +43,13 @@ const Description = forwardRef(({ formData = {}, updateFormData, validationError
   // --- Quality Status Logic ---
   const getQualityInfo = () => {
     if (charCount === 0) return { label: 'Empty', color: theme.bodyGrayText, percent: 0 };
-    if (charCount < 750) return { label: 'Needs More Work', color: '#ef4444', percent: (charCount / MIN_CHARS) * 100 };
-    if (charCount < 1000) return { label: 'Good', color: '#f59e0b', percent: (charCount / MIN_CHARS) * 100 };
-    if (charCount < MIN_CHARS) return { label: 'Better', color: '#8bc34a', percent: (charCount / MIN_CHARS) * 100 };
-    if (charCount <= MAX_CHARS) return { label: 'Perfect! You can now proceed.', color: '#22c55e', percent: 100 };
-    return { label: 'Too Long', color: '#ef4444', percent: 100 };
+    if (charCount < 750) return { label: 'Needs More Work', color: theme.primaryOrange, percent: (charCount / 750) * 33 };
+    if (charCount < 1000) return { label: 'Good', color: '#ffb300', percent: 50 };
+    if (charCount < 1500) return { label: 'Better', color: '#8bc34a', percent: 75 };
+    return { label: 'Best / Professional', color: '#4caf50', percent: 100 };
   };
 
   const quality = getQualityInfo();
-
-  // --- Remaining characters calculation ---
-  const getRemainingMessage = () => {
-    if (charCount === 0) return `Need ${MIN_CHARS} more characters to continue.`;
-    if (charCount < MIN_CHARS) {
-      const remaining = MIN_CHARS - charCount;
-      return `Need ${remaining} more character${remaining === 1 ? '' : 's'} to continue.`;
-    }
-    if (charCount > MAX_CHARS) {
-      const over = charCount - MAX_CHARS;
-      return `${over} character${over === 1 ? '' : 's'} over the limit. Please reduce.`;
-    }
-    return 'Perfect! You can now proceed.';
-  };
-
-  // --- Progress bar color based on zones ---
-  const getProgressColor = () => {
-    if (charCount < MIN_CHARS * 0.5) return '#ef4444'; // Red: 0% - 50%
-    if (charCount < MIN_CHARS) return '#f59e0b'; // Orange/Yellow: 50% - 99%
-    if (charCount <= MAX_CHARS) return '#22c55e'; // Green: 100%+
-    return '#ef4444'; // Red if over limit
-  };
-
-  const getProgressPercent = () => {
-    const pct = (charCount / MIN_CHARS) * 100;
-    return Math.min(pct, 100);
-  };
 
   const modules = {
     toolbar: [
@@ -124,23 +77,9 @@ const Description = forwardRef(({ formData = {}, updateFormData, validationError
   const closeEmoji = () => setAnchorEl(null);
   const isEmojiOpen = Boolean(anchorEl);
 
-  const handleCloseToast = () => setShowErrorToast(false);
-
   return (
     <Box sx={{ maxWidth: '850px', margin: 'auto', bgcolor: theme.mainBg, p: { xs: 2, md: 4 }, borderRadius: 3 }}>
-
-      {/* Shake animation keyframes */}
-      <style>{`
-        @keyframes quill-shake {
-          0%, 100% { transform: translateX(0); }
-          10%, 30%, 50%, 70%, 90% { transform: translateX(-6px); }
-          20%, 40%, 60%, 80% { transform: translateX(6px); }
-        }
-        .shake-animation {
-          animation: quill-shake 0.6s ease-in-out;
-        }
-      `}</style>
-
+      
       {/* Header Section with Quality Badge */}
       <Stack direction="row" justifyContent="space-between" alignItems="center" sx={{ mb: 4 }}>
         <Box>
@@ -151,36 +90,36 @@ const Description = forwardRef(({ formData = {}, updateFormData, validationError
             Apni service ki mukammal detail likhein.
           </Typography>
         </Box>
-
-        <Chip
+        
+        <Chip 
           icon={<ShutterSpeedIcon style={{ color: quality.color }} />}
           label={quality.label}
           variant="outlined"
-          sx={{
-            borderColor: quality.color,
-            color: quality.color,
+          sx={{ 
+            borderColor: quality.color, 
+            color: quality.color, 
             fontWeight: 'bold',
-            bgcolor: `${quality.color}11`
+            bgcolor: `${quality.color}11` // Adding 11 for very light transparency
           }}
         />
       </Stack>
 
       <FormControl fullWidth error={!!validationErrors.description}>
         <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-end', mb: 1.5 }}>
-          <FormLabel sx={{
-            fontWeight: '600',
+          <FormLabel sx={{ 
+            fontWeight: '600', 
             color: theme.mediumGrayTitle,
             fontSize: '0.85rem',
             letterSpacing: '0.5px',
             '&.Mui-focused': { color: theme.primaryOrange }
           }}>
-            CONTENT ({charCount}/{MAX_CHARS}) — Min: {MIN_CHARS} chars
+            CONTENT ({charCount}/3000) — Min: 1500 chars
           </FormLabel>
-
-          <IconButton
+          
+          <IconButton 
             onClick={openEmoji}
-            sx={{
-              color: theme.primaryOrange,
+            sx={{ 
+              color: theme.primaryOrange, 
               bgcolor: theme.cardBg,
               border: `1px solid ${theme.lightBorder}`,
               borderRadius: '8px',
@@ -192,15 +131,13 @@ const Description = forwardRef(({ formData = {}, updateFormData, validationError
         </Box>
 
         {/* Editor Wrapper */}
-        <Paper
-          variant="outlined"
-          className={isShaking ? 'shake-animation' : ''}
-          sx={{
+        <Paper 
+          variant="outlined" 
+          sx={{ 
             bgcolor: theme.cardBg,
-            borderColor: !!validationErrors.description ? '#ef4444' : isShaking ? '#ef4444' : theme.lightBorder,
+            borderColor: !!validationErrors.description ? '#ef4444' : theme.lightBorder,
             borderRadius: '12px',
             overflow: 'hidden',
-            transition: 'border-color 0.3s ease',
             '&:focus-within': { borderColor: theme.orangeBorderActive },
             '& .ql-toolbar': {
               border: 'none',
@@ -220,10 +157,10 @@ const Description = forwardRef(({ formData = {}, updateFormData, validationError
             '& .ql-editor.ql-blank::before': { color: theme.bodyGrayText, fontStyle: 'normal' }
           }}
         >
-          <ReactQuill
+          <ReactQuill 
             ref={quillRef}
-            theme="snow"
-            value={description}
+            theme="snow" 
+            value={description} 
             onChange={handleDescriptionChange}
             modules={modules}
             placeholder="I will provide professional services for..."
@@ -239,78 +176,39 @@ const Description = forwardRef(({ formData = {}, updateFormData, validationError
           <EmojiPicker onEmojiClick={handleEmojiClick} theme={EmojiTheme.DARK} width={300} height={400} />
         </Popover>
 
-        {/* --- Dynamic Remaining Characters Message --- */}
-        <Box sx={{ mt: 2, mb: 1 }}>
-          <Typography
-            variant="body2"
-            sx={{
-              color: charCount >= MIN_CHARS && charCount <= MAX_CHARS ? '#22c55e' : charCount > MAX_CHARS ? '#ef4444' : '#f59e0b',
-              fontWeight: '600',
-              textAlign: 'center',
-              fontSize: '0.9rem'
-            }}
-          >
-            {getRemainingMessage()}
-          </Typography>
-        </Box>
-
-        {/* --- Visual Progress Bar with Color Zones --- */}
-        <Box sx={{ mt: 2 }}>
+        {/* --- Dynamic Good/Better/Best Progress Bar --- */}
+        <Box sx={{ mt: 3 }}>
           <Stack direction="row" justifyContent="space-between" sx={{ mb: 1 }}>
             <Typography variant="caption" sx={{ color: theme.mediumGrayTitle, fontWeight: 'bold' }}>
               Quality Meter:
             </Typography>
-            <Typography variant="caption" sx={{ color: getProgressColor(), fontWeight: 'bold' }}>
-              {Math.round(getProgressPercent())}%
+            <Typography variant="caption" sx={{ color: quality.color, fontWeight: 'bold' }}>
+              {charCount < 750 ? `${750 - charCount} chars for 'Good'` : quality.label}
             </Typography>
           </Stack>
-
-          <Box sx={{
-            height: '12px',
-            bgcolor: 'rgba(255,255,255,0.05)',
-            borderRadius: 5,
+          
+          <Box sx={{ 
+            height: '10px', 
+            bgcolor: 'rgba(255,255,255,0.05)', 
+            borderRadius: 5, 
             position: 'relative',
             overflow: 'hidden',
             border: `1px solid ${theme.lightBorder}`
           }}>
-            {/* Background zone markers */}
-            <Box sx={{
-              position: 'absolute',
-              top: 0,
-              left: 0,
-              width: '50%',
-              height: '100%',
-              bgcolor: 'rgba(239, 68, 68, 0.08)',
-              borderRight: '1px dashed rgba(239, 68, 68, 0.3)'
-            }} />
-            <Box sx={{
-              position: 'absolute',
-              top: 0,
-              left: '50%',
-              width: '49%',
-              height: '100%',
-              bgcolor: 'rgba(245, 158, 11, 0.08)',
-              borderRight: '1px dashed rgba(34, 197, 94, 0.5)'
-            }} />
-
-            {/* Active progress fill */}
-            <Box sx={{
-              width: `${getProgressPercent()}%`,
-              height: '100%',
-              bgcolor: getProgressColor(),
+            <Box sx={{ 
+              width: `${quality.percent}%`, 
+              height: '100%', 
+              bgcolor: quality.color, 
               transition: 'all 0.5s cubic-bezier(0.4, 0, 0.2, 1)',
-              boxShadow: `0 0 12px ${getProgressColor()}88`,
-              borderRadius: 5,
-              position: 'relative',
-              zIndex: 1
+              boxShadow: `0 0 10px ${quality.color}66`
             }} />
           </Box>
-
+          
           <Stack direction="row" justifyContent="space-between" sx={{ mt: 0.5, px: 0.5 }}>
             <Typography variant="caption" sx={{ color: theme.bodyGrayText, fontSize: '0.65rem' }}>START</Typography>
-            <Typography variant="caption" sx={{ color: charCount >= MIN_CHARS * 0.5 ? '#f59e0b' : theme.bodyGrayText, fontSize: '0.65rem' }}>50%</Typography>
-            <Typography variant="caption" sx={{ color: charCount >= MIN_CHARS ? '#22c55e' : theme.bodyGrayText, fontSize: '0.65rem' }}>MIN ({MIN_CHARS})</Typography>
-            <Typography variant="caption" sx={{ color: charCount > MAX_CHARS ? '#ef4444' : theme.bodyGrayText, fontSize: '0.65rem' }}>MAX ({MAX_CHARS})</Typography>
+            <Typography variant="caption" sx={{ color: charCount >= 750 ? '#ffb300' : theme.bodyGrayText, fontSize: '0.65rem' }}>GOOD (750)</Typography>
+            <Typography variant="caption" sx={{ color: charCount >= 1000 ? '#8bc34a' : theme.bodyGrayText, fontSize: '0.65rem' }}>BETTER (1000)</Typography>
+            <Typography variant="caption" sx={{ color: charCount >= 1500 ? '#4caf50' : theme.bodyGrayText, fontSize: '0.65rem' }}>BEST (1500+)</Typography>
           </Stack>
         </Box>
 
@@ -319,33 +217,9 @@ const Description = forwardRef(({ formData = {}, updateFormData, validationError
         </FormHelperText>
       </FormControl>
 
-      {/* Error Toast for insufficient characters */}
-      <Snackbar
-        open={showErrorToast}
-        autoHideDuration={5000}
-        onClose={handleCloseToast}
-        anchorOrigin={{ vertical: 'top', horizontal: 'center' }}
-      >
-        <Alert
-          onClose={handleCloseToast}
-          severity="error"
-          sx={{
-            width: '100%',
-            bgcolor: 'rgba(239, 68, 68, 0.15)',
-            color: '#ffffff',
-            border: '1px solid rgba(239, 68, 68, 0.4)',
-            borderRadius: '12px',
-            backdropFilter: 'blur(12px)',
-            '& .MuiAlert-icon': { color: '#ef4444' }
-          }}
-        >
-          Aapki gig description abhi choti hai. Barae meharbani {MIN_CHARS - charCount} mazeed characters likhein taake aap next step par ja sakein.
-        </Alert>
-      </Snackbar>
+      
     </Box>
   );
-});
-
-Description.displayName = 'Description';
+};
 
 export default Description;

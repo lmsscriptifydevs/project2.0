@@ -196,28 +196,9 @@ export const getUser = createAsyncThunk(
       const response = await axios.get("user", {
         headers: { Authorization: `Bearer ${accessToken}` },
       });
-      // Laravel profile endpoint returns { success: true, user: {...} }
-      return response.data.user || response.data.data;
+      return response.data.data;
     } catch (error) {
       return rejectWithValue(error?.response?.data?.message || error?.message);
-    }
-  },
-);
-
-// ✅ NEW: Refresh token thunk for Laravel /refresh-token route
-export const refreshToken = createAsyncThunk(
-  "user/refreshToken",
-  async (_, { rejectWithValue }) => {
-    try {
-      const response = await axios.post("refresh-token", {});
-      const newToken = response.data?.access_token || response.data?.token;
-      if (newToken) {
-        localStorage.setItem("accessToken", newToken);
-      }
-      return response.data;
-    } catch (error) {
-      localStorage.removeItem("accessToken");
-      return rejectWithValue(error?.response?.data?.message || "Token refresh failed");
     }
   },
 );
@@ -597,23 +578,6 @@ const userSlice = createSlice({
       })
       .addCase(getCategories.rejected, (state, action) => {
         state.isLoadingCategories = false;
-        state.authError = action.payload;
-      })
-
-      // Refresh Token
-      .addCase(refreshToken.pending, (state) => {
-        state.authLoading = true;
-      })
-      .addCase(refreshToken.fulfilled, (state, action) => {
-        state.authLoading = false;
-        state.isAuthenticated = true;
-        state.tokenValidated = true;
-        state.authError = null;
-      })
-      .addCase(refreshToken.rejected, (state, action) => {
-        state.authLoading = false;
-        state.isAuthenticated = false;
-        state.tokenValidated = true;
         state.authError = action.payload;
       });
   },

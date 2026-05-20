@@ -949,6 +949,12 @@ const FreelancersGigs = () => {
                         <p className="ms-2 font-14 mb-0" style={{ color: THEME.accent.primary }}>
                           ({overallAverageRating.toFixed(1)})
                         </p>
+
+                        {singleGigDetail?.orders_in_queue !== undefined && singleGigDetail.orders_in_queue > 0 && (
+                          <span className="ms-3 badge rounded-pill px-2.5 py-1 font-12 fw-semibold" style={{ backgroundColor: `${THEME.accent.primary}26`, color: THEME.accent.primary, border: `1px solid ${THEME.border.active}` }}>
+                            {singleGigDetail.orders_in_queue} {singleGigDetail.orders_in_queue === 1 ? "Order" : "Orders"} in Queue
+                          </span>
+                        )}
                       </div>
                     </div>
                   </div>

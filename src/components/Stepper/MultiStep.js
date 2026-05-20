@@ -22,7 +22,7 @@ import { toast, ToastContainer } from 'react-toastify';
 import 'react-toastify/dist/ReactToastify.css';
 
 import axios from '../../utils/axios';
-import { clearValidationErrors, setCurrentStep, setValidationErrors } from '../../redux/slices/gigsSlice';
+import { clearValidationErrors, setCurrentStep } from '../../redux/slices/gigsSlice';
 import { getGigDetail } from '../../redux/slices/allGigsSlice';
 import {
   Description, FAQ, Gallery, Overview,
@@ -108,122 +108,37 @@ const uploadSingleFile = async (file, label) => {
 };
 
 const uploadGalleryFiles = async (gigId, currentFormData, updateToast) => {
-  // Build complete payload for ALL 3 image slots, video, and 2 PDF slots
-  // This ensures removed files are properly cleared on the server
   const totalFiles = [];
-  
-  // Track which slots have new files vs existing URLs vs empty (removed)
-  const imageSlots = [null, null, null]; // 3 image slots
-  const pdfSlots = [null, null]; // 2 PDF slots
-  let videoSlot = null;
-  let hasVideoExplicitlyRemoved = false;
-
-  // Process images - track by slot index
   (currentFormData.images || []).forEach((img, i) => {
     if (i >= 3) return;
     const file = img?.fileObject ?? (img instanceof File ? img : null);
-    if (file instanceof File) {
-      totalFiles.push({ type: 'image', index: i, file });
-      imageSlots[i] = { type: 'new', file };
-    } else if (img?.url || typeof img === 'string') {
-      // Existing URL - preserve it
-      imageSlots[i] = { type: 'existing', url: img.url || img };
-    } else {
-      imageSlots[i] = { type: 'empty' };
-    }
+    if (file instanceof File) totalFiles.push({ type: 'image', index: i, file });
   });
-
-  // Check if video was explicitly removed (null) or has a file/URL
   const videoItem = currentFormData.video;
-  if (videoItem === null || videoItem === undefined) {
-    hasVideoExplicitlyRemoved = true;
-    videoSlot = { type: 'empty' };
-  } else {
-    const videoFile = videoItem?.fileObject ?? (videoItem instanceof File ? videoItem : null);
-    if (videoFile instanceof File) {
-      totalFiles.push({ type: 'video', file: videoFile });
-      videoSlot = { type: 'new', file: videoFile };
-    } else if (videoItem?.url || typeof videoItem === 'string') {
-      videoSlot = { type: 'existing', url: videoItem.url || videoItem };
-    }
-  }
-
-  // Process documents - track by slot index
+  const videoFile = videoItem?.fileObject ?? (videoItem instanceof File ? videoItem : null);
+  if (videoFile instanceof File) totalFiles.push({ type: 'video', file: videoFile });
   (currentFormData.documents || []).forEach((doc, i) => {
     if (i >= 2) return;
     const file = doc?.fileObject ?? (doc instanceof File ? doc : null);
-    if (file instanceof File) {
-      totalFiles.push({ type: 'pdf', index: i, file });
-      pdfSlots[i] = { type: 'new', file };
-    } else if (doc?.url || typeof doc === 'string') {
-      pdfSlots[i] = { type: 'existing', url: doc.url || doc };
-    } else {
-      pdfSlots[i] = { type: 'empty' };
-    }
+    if (file instanceof File) totalFiles.push({ type: 'pdf', index: i, file });
   });
+  if (totalFiles.length === 0) return false;
 
-  // Upload new files first
-  const newImageUrls = {};
-  let newVideoUrl = null;
-  const newPdfUrls = {};
-  let uploadCount = 0;
-
+  const imageUrls = []; let videoUrl = null; const pdfUrls = {}; let uploadCount = 0;
   for (const item of totalFiles) {
     uploadCount++;
     if (updateToast) updateToast(`Uploading file ${uploadCount}/${totalFiles.length}...`);
     const label = item.type === 'image' ? `image ${item.index + 1}` : item.type === 'video' ? 'video' : `PDF ${item.index + 1}`;
     const fileUrl = await uploadSingleFile(item.file, label);
-    if (item.type === 'image') newImageUrls[item.index] = fileUrl;
-    else if (item.type === 'video') newVideoUrl = fileUrl;
-    else newPdfUrls[item.index] = fileUrl;
+    if (item.type === 'image') imageUrls.push(fileUrl);
+    else if (item.type === 'video') videoUrl = fileUrl;
+    else pdfUrls[`pdf_file${item.index + 1}`] = fileUrl;
   }
-
   if (updateToast) updateToast('Saving media to gig...');
-
-  // Build complete payload with ALL slots (including empty ones for removed files)
   const galleryPayload = { gig_id: gigId };
-
-  // Build image1, image2, image3 fields
-  for (let i = 0; i < 3; i++) {
-    const slot = imageSlots[i];
-    if (slot?.type === 'new' && newImageUrls[i]) {
-      galleryPayload[`image${i + 1}`] = newImageUrls[i];
-    } else if (slot?.type === 'existing') {
-      galleryPayload[`image${i + 1}`] = slot.url;
-    } else {
-      // Empty slot - explicitly clear this image on server
-      // Use a special marker that won't be converted to null by axios
-      galleryPayload[`image${i + 1}`] = '__CLEAR__';
-    }
-  }
-
-  // Build video field
-  if (videoSlot?.type === 'new' && newVideoUrl) {
-    galleryPayload.video = newVideoUrl;
-  } else if (videoSlot?.type === 'existing') {
-    galleryPayload.video = videoSlot.url;
-  } else if (hasVideoExplicitlyRemoved || videoSlot?.type === 'empty') {
-    // Explicitly clear video on server
-    galleryPayload.video = '__CLEAR__';
-  }
-
-  // Build pdf_file1, pdf_file2 fields
-  for (let i = 0; i < 2; i++) {
-    const slot = pdfSlots[i];
-    if (slot?.type === 'new' && newPdfUrls[i]) {
-      galleryPayload[`pdf_file${i + 1}`] = newPdfUrls[i];
-    } else if (slot?.type === 'existing') {
-      galleryPayload[`pdf_file${i + 1}`] = slot.url;
-    } else {
-      // Empty slot - explicitly clear this PDF on server
-      galleryPayload[`pdf_file${i + 1}`] = '__CLEAR__';
-    }
-  }
-
-  console.log('[GIG-GALLERY] Payload being sent:', Object.entries(galleryPayload).map(([k, v]) => 
-    `${k}: ${typeof v === 'string' && v.length > 50 ? v.substring(0, 50) + '...' : v}`
-  ));
-
+  if (imageUrls.length > 0) galleryPayload.images = imageUrls;
+  if (videoUrl) galleryPayload.video = videoUrl;
+  Object.assign(galleryPayload, pdfUrls);
   await axios.post('gig-gallery', galleryPayload, { timeout: 60000 });
   return true;
 };
@@ -253,7 +168,6 @@ const CreateGig = () => {
 
   const formDataRef    = useRef({});
   const initialLoadRef = useRef(true);
-  const descriptionRef = useRef(null);
 
   const { gigData, editGigIdFromRoute, editFlag } = useMemo(() => ({
     gigData:            location.state?.gigData || location.state?.gig,
@@ -435,54 +349,6 @@ const CreateGig = () => {
   const handleNext = async () => {
     try {
       dispatch(clearValidationErrors());
-
-      // Special handling for Description step: keep button enabled, show toast + shake on fail
-      if (currentStep === GIG_STEPS.DESCRIPTION) {
-        const plainText = (formData.description || '').replace(/<[^>]*>/g, '').trim();
-        if (plainText.length < 1500) {
-          const remaining = 1500 - plainText.length;
-          toast.error(
-            `Aapki gig description abhi choti hai. Barae meharbani ${remaining} mazeed characters likhein taake aap next step par ja sakein.`,
-            { autoClose: 5000, toastId: 'desc-length-error' }
-          );
-          // Trigger shake animation on the description editor
-          if (descriptionRef.current?.triggerShake) {
-            descriptionRef.current.triggerShake();
-          }
-          // Also show the inline error toast inside Description component
-          if (descriptionRef.current?.showErrorToast) {
-            descriptionRef.current.showErrorToast();
-          }
-          return;
-        }
-      }
-
-      // Special handling for FAQ step (Step 3): show toast if no FAQs added
-      if (currentStep === GIG_STEPS.FAQ) {
-        const faqs = formData.faqs || [];
-        if (faqs.length === 0) {
-          toast.error(
-            'Barae meharbani kam se kam 1 FAQ add karein. FAQ section zaruri hai taake buyers aapki service ko behter samajh sakein.',
-            { autoClose: 5000, toastId: 'faq-required-error' }
-          );
-          dispatch(setValidationErrors({ faqs: 'Please add at least 1 FAQ before proceeding' }));
-          return;
-        }
-      }
-
-      // Special handling for Requirements step (Step 4): show toast if no requirements added
-      if (currentStep === GIG_STEPS.REQUIREMENTS) {
-        const requirements = formData.requirements || [];
-        if (requirements.length === 0) {
-          toast.error(
-            'Barae meharbani kam se kam 1 requirement add karein. Requirements section zaruri hai taake aapko kaam shuru karne ke liye zaruri malomat milein.',
-            { autoClose: 5000, toastId: 'requirements-required-error' }
-          );
-          dispatch(setValidationErrors({ requirements: 'Please add at least 1 requirement before proceeding' }));
-          return;
-        }
-      }
-
       if (!validateStep(currentStep)) return;
       if (currentStep === GIG_STEPS.PUBLISH) { await handlePublish(); return; }
       dispatch(setCurrentStep(currentStep + 1));
@@ -508,7 +374,7 @@ const CreateGig = () => {
     switch (step) {
       case GIG_STEPS.OVERVIEW:      return <Overview {...commonProps} />;
       case GIG_STEPS.PRICING:       return <Pricing {...commonProps} />;
-      case GIG_STEPS.DESCRIPTION:   return <Description ref={descriptionRef} {...commonProps} />;
+      case GIG_STEPS.DESCRIPTION:   return <Description {...commonProps} />;
       case GIG_STEPS.FAQ:           return <FAQ {...commonProps} />;
       case GIG_STEPS.REQUIREMENTS:  return <Requirements {...commonProps} />;
       case GIG_STEPS.GALLERY:       return <Gallery {...commonProps} />;
@@ -681,23 +547,16 @@ const CreateGig = () => {
           <Button
             variant="contained"
             onClick={handleNext}
-            disabled={isPublishing}
+            disabled={!isStepValid(currentStep) || isPublishing}
             fullWidth={isMobile}
             startIcon={isPublishing ? <CircularProgress size={16} color="inherit" /> : null}
             sx={{
               backgroundColor: T.orange,
               textTransform: 'none', borderRadius: '10px', fontWeight: 700,
               minWidth: { xs: '100%', sm: 150 },
-              boxShadow: isStepValid(currentStep)
-                ? '0 0 20px rgba(34, 197, 94, 0.5), 0 0 40px rgba(34, 197, 94, 0.2)'
-                : '0 4px 14px rgba(240,89,31,0.35)',
-              transition: 'box-shadow 0.4s ease, transform 0.2s ease',
-              animation: isStepValid(currentStep) ? 'next-glow 2s ease-in-out infinite' : 'none',
-              '@keyframes next-glow': {
-                '0%, 100%': { boxShadow: '0 0 20px rgba(34, 197, 94, 0.5), 0 0 40px rgba(34, 197, 94, 0.2)' },
-                '50%':      { boxShadow: '0 0 30px rgba(34, 197, 94, 0.7), 0 0 60px rgba(34, 197, 94, 0.3)' },
-              },
+              boxShadow: `0 4px 14px rgba(240,89,31,0.35)`,
               '&:hover': { backgroundColor: T.orangeHover, boxShadow: `0 6px 18px rgba(240,89,31,0.45)` },
+              '&:disabled': { backgroundColor: 'rgba(240,89,31,0.25)', color: 'rgba(255,255,255,0.4)', boxShadow: 'none' },
             }}
           >
             {isPublishing

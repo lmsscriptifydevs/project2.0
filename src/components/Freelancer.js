@@ -14,7 +14,7 @@ import {
 import DefaultImage from "../assets/default.webp";
 
 // Apne backend ka base URL yahan set karein
-const API_BASE_URL = process.env.REACT_APP_API_URL || "http://localhost:8000";
+const API_BASE_URL = process.env.REACT_APP_API_URL || "https://portal.grapetask.co";
 
 const Freelancer = React.memo(function Freelancer(props) {
   const {

@@ -5,19 +5,22 @@ import { useUserData } from "../../../utils/useLocalStorage";
 const UnRead = ({ conversation, onClick, isSelected, isOnline }) => {
   const currentUser = useUserData();
   const theme = {
-    pureWhite: "#ffffff",
-    primaryOrange: "#f0591f",
-    bodyGray: "#71717a",
-    cardBg: "rgba(255, 255, 255, 0.03)",
-    lightBorder: "rgba(255, 255, 255, 0.06)"
+    pureWhite: "var(--inbox-text-main, #ffffff)",
+    primaryOrange: "var(--inbox-primary, #f0591f)",
+    bodyGray: "var(--inbox-text-light, #71717a)",
+    cardBg: "var(--inbox-hover, rgba(255, 255, 255, 0.03))",
+    lightBorder: "var(--inbox-border, rgba(255, 255, 255, 0.06))"
   };
 
   const rawUser = conversation?.user;
   const otherUser = rawUser && rawUser.id !== currentUser.id ? rawUser : null;
-  const displayName = otherUser ? `${otherUser.fname || ""} ${otherUser.lname || ""}`.trim() : "User";
+  const displayName = conversation?.is_group ? conversation.title : (otherUser ? `${otherUser.fname || ""} ${otherUser.lname || ""}`.trim() : "User");
 
   const lastMsgRaw = conversation?.last_message ?? conversation?.lastMessage;
-  const lastMessage = typeof lastMsgRaw === "string" ? lastMsgRaw : lastMsgRaw?.message ?? lastMsgRaw?.body ?? "No messages yet";
+  let lastMessage = typeof lastMsgRaw === "string" ? lastMsgRaw : lastMsgRaw?.message ?? lastMsgRaw?.body ?? "No messages yet";
+  if (lastMsgRaw && typeof lastMsgRaw === "object" && lastMsgRaw.message_type === "call") {
+    lastMessage = "📞 Live Meeting";
+  }
   const timeRaw = conversation?.last_message_time || (typeof lastMsgRaw === "object" && lastMsgRaw?.created_at);
   const time = timeRaw ? moment(timeRaw).format("HH:mm") : "";
   const unreadCount = conversation?.unread_count ?? conversation?.unreadCount ?? 0;
@@ -26,7 +29,7 @@ const UnRead = ({ conversation, onClick, isSelected, isOnline }) => {
     <div
       className="d-flex align-items-center p-3 mb-1"
       style={{ 
-        backgroundColor: isSelected ? "rgba(255,255,255,0.05)" : theme.cardBg, 
+        backgroundColor: isSelected ? "var(--inbox-hover, rgba(255,255,255,0.05))" : theme.cardBg, 
         cursor: "pointer", 
         transition: "0.2s",
         borderRadius: '12px',
@@ -35,13 +38,26 @@ const UnRead = ({ conversation, onClick, isSelected, isOnline }) => {
       onClick={onClick}
     >
       <div className="position-relative">
-        <img
-          src={otherUser?.image || userFallback}
-          width={45}
-          height={45}
-          alt="user"
-          style={{ borderRadius: "50%", objectFit: "cover" }}
-        />
+        {conversation?.is_group ? (
+          <div
+            style={{ 
+              width: 45, height: 45, borderRadius: "50%", 
+              backgroundColor: "var(--inbox-primary)", color: "#fff", 
+              display: "flex", alignItems: "center", justifyContent: "center",
+              fontSize: "20px", fontWeight: "bold", border: `1px solid ${theme.lightBorder}` 
+            }}
+          >
+            👥
+          </div>
+        ) : (
+          <img
+            src={otherUser?.image || userFallback}
+            width={45}
+            height={45}
+            alt="user"
+            style={{ borderRadius: "50%", objectFit: "cover" }}
+          />
+        )}
         {isOnline && (
           <span className="position-absolute rounded-circle"
             style={{ 

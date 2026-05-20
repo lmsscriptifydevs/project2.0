@@ -12,12 +12,6 @@ import {
 } from '@mui/material';
 import { useState } from 'react';
 
-// Constants for validation
-const PACKAGE_TITLE_MAX_CHARS = 50;
-const PACKAGE_DESC_MIN_CHARS = 750;
-const PACKAGE_DESC_MAX_CHARS = 1000;
-const PACKAGE_MIN_PRICE = 5;
-
 const Pricing = ({ formData = {}, updateFormData, validationErrors: propErrors = {}, isEditMode = false }) => {
   const packages = ['basic', 'standard', 'premium'];
   const packageTitles = {
@@ -25,6 +19,8 @@ const Pricing = ({ formData = {}, updateFormData, validationErrors: propErrors =
     standard: 'Standard Package',
     premium: 'Premium Package'
   };
+
+  const [localErrors, setLocalErrors] = useState({});
 
   // Theme Colors Constants
   const theme = {
@@ -74,33 +70,11 @@ const Pricing = ({ formData = {}, updateFormData, validationErrors: propErrors =
   };
 
   const handleFieldChange = (pkgType, field, value) => {
-    // Enforce max length for title
-    if (field === 'title' && value.length > PACKAGE_TITLE_MAX_CHARS) {
-      return; // Don't update if over limit
-    }
     updatePackage(pkgType, field, value);
     // validation logic stays same as requested
   };
 
-  // Get character count color for description
-  const getDescCharCountColor = (pkgType) => {
-    const desc = safePackages[pkgType]?.description || '';
-    if (desc.length === 0) return theme.bodyGrayText;
-    if (desc.length < PACKAGE_DESC_MIN_CHARS) return theme.primaryOrange;
-    if (desc.length > PACKAGE_DESC_MAX_CHARS) return "#ef4444";
-    return "#4caf50";
-  };
-
-  // Get character count color for title
-  const getTitleCharCountColor = (pkgType) => {
-    const title = safePackages[pkgType]?.title || '';
-    if (title.length === 0) return theme.bodyGrayText;
-    if (title.length >= PACKAGE_TITLE_MAX_CHARS) return "#ef4444";
-    if (title.length >= PACKAGE_TITLE_MAX_CHARS - 10) return theme.primaryOrange;
-    return "#4caf50";
-  };
-
-  const allErrors = { ...propErrors };
+  const allErrors = { ...localErrors, ...propErrors };
 
   return (
     <Box sx={{ backgroundColor: theme.mainBg, p: 1 }}>
@@ -143,43 +117,33 @@ const Pricing = ({ formData = {}, updateFormData, validationErrors: propErrors =
 
                 <TextField
                   fullWidth
-                  label={`Package Title (${(safePackages[pkgType]?.title || '').length}/${PACKAGE_TITLE_MAX_CHARS})`}
+                  label="Package Title (Max: 50 chars)"
                   value={safePackages[pkgType]?.title || ''}
                   onChange={(e) => handleFieldChange(pkgType, 'title', e.target.value)}
                   error={!!allErrors[`${pkgType}_title`]}
-                  helperText={allErrors[`${pkgType}_title`] || `Maximum ${PACKAGE_TITLE_MAX_CHARS} characters`}
-                  inputProps={{
-                    maxLength: PACKAGE_TITLE_MAX_CHARS,
-                  }}
+                  helperText={allErrors[`${pkgType}_title`]}
                   sx={inputSx}
                 />
-                <Typography variant="caption" sx={{ mt: -1.5, mb: 1, display: 'block', color: getTitleCharCountColor(pkgType) }}>
-                  {(safePackages[pkgType]?.title || '').length}/{PACKAGE_TITLE_MAX_CHARS} characters
-                  {(safePackages[pkgType]?.title || '').length >= PACKAGE_TITLE_MAX_CHARS && <span> ⚠️ Max reached</span>}
-                </Typography>
 
                 <TextField
                   fullWidth
                   multiline
                   rows={3}
-                  label={`Package Description (${(safePackages[pkgType]?.description || '').length}/${PACKAGE_DESC_MAX_CHARS}) — Min: ${PACKAGE_DESC_MIN_CHARS} chars`}
+                  label={`Package Description (${(safePackages[pkgType]?.description || '').length}/1000) — Min: 750 chars`}
                   value={safePackages[pkgType]?.description || ''}
                   onChange={(e) => {
-                    if (e.target.value.length <= PACKAGE_DESC_MAX_CHARS) {
+                    if (e.target.value.length <= 1000) {
                       handleFieldChange(pkgType, 'description', e.target.value);
                     }
                   }}
                   error={!!allErrors[`${pkgType}_description`]}
                   helperText={allErrors[`${pkgType}_description`]}
-                  inputProps={{
-                    maxLength: PACKAGE_DESC_MAX_CHARS,
-                  }}
                   sx={inputSx}
                 />
-                <Typography variant="caption" sx={{ mt: -1.5, mb: 2, display: 'block', color: getDescCharCountColor(pkgType) }}>
-                  {(safePackages[pkgType]?.description || '').length}/{PACKAGE_DESC_MAX_CHARS} characters
-                  {(safePackages[pkgType]?.description || '').length < PACKAGE_DESC_MIN_CHARS && <span> — Need {PACKAGE_DESC_MIN_CHARS - (safePackages[pkgType]?.description || '').length} more chars</span>}
-                  {(safePackages[pkgType]?.description || '').length >= PACKAGE_DESC_MIN_CHARS && <span> ✓ Min reached</span>}
+                <Typography variant="caption" sx={{ mt: -1.5, mb: 2, display: 'block', color: (safePackages[pkgType]?.description || '').length >= 750 ? '#4caf50' : theme.primaryOrange }}>
+                  {(safePackages[pkgType]?.description || '').length}/1000 characters
+                  {(safePackages[pkgType]?.description || '').length < 750 && <span> — Need {750 - (safePackages[pkgType]?.description || '').length} more chars</span>}
+                  {(safePackages[pkgType]?.description || '').length >= 750 && <span> ✓ Min reached</span>}
                 </Typography>
 
                 <FormControl fullWidth sx={inputSx} error={!!allErrors[`${pkgType}_delivery_time`]}>
@@ -221,16 +185,12 @@ const Pricing = ({ formData = {}, updateFormData, validationErrors: propErrors =
 
                 <TextField
                   fullWidth
-                  label={`Price (Min: $${PACKAGE_MIN_PRICE})`}
+                  label="Price (Min: $5)"
                   type="number"
                   value={safePackages[pkgType]?.price || ''}
                   onChange={(e) => handleFieldChange(pkgType, 'price', e.target.value)}
                   error={!!allErrors[`${pkgType}_price`]}
-                  helperText={allErrors[`${pkgType}_price`] || `Minimum price is $${PACKAGE_MIN_PRICE}`}
                   sx={inputSx}
-                  inputProps={{
-                    min: PACKAGE_MIN_PRICE,
-                  }}
                   InputProps={{
                     startAdornment: <Typography sx={{ mr: 1, color: theme.primaryOrange, fontWeight: 'bold' }}>$</Typography>,
                   }}

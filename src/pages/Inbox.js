@@ -66,6 +66,8 @@ const FreelanceInbox = () => {
   }, [conversations, searchQuery, getOtherParticipant]);
 
   const activeUser = selectedConversation ? getOtherParticipant(selectedConversation) : null;
+  const activeName = selectedConversation?.is_group ? selectedConversation.title : (activeUser?.fname || activeUser?.name || "Unknown");
+  const activeImage = selectedConversation?.is_group ? null : activeUser?.image;
 
   return (
     <div className="gt-inbox-wrapper">
@@ -104,6 +106,9 @@ const FreelanceInbox = () => {
                 const otherUser = getOtherParticipant(conversation);
                 const isActive = selectedConversation?.id === conversation.id;
                 
+                const convName = conversation.is_group ? conversation.title : (otherUser?.fname || otherUser?.name || "Unknown");
+                const convImage = conversation.is_group ? null : otherUser?.image;
+
                 return (
                   <div
                     key={conversation.id}
@@ -111,19 +116,19 @@ const FreelanceInbox = () => {
                     onClick={() => handleConversationSelect(conversation)}
                   >
                     <div className="gt-avatar-wrap">
-                      {otherUser?.image ? (
-                        <img src={otherUser.image} alt={otherUser.fname || "User"} className="gt-avatar" />
+                      {convImage ? (
+                        <img src={convImage} alt={convName} className="gt-avatar" />
                       ) : (
-                        <div className="gt-avatar-placeholder">
-                          {(otherUser?.fname || "?").charAt(0).toUpperCase()}
+                        <div className="gt-avatar-placeholder" style={conversation.is_group ? { background: '#10b981', color: '#fff' } : {}}>
+                          {conversation.is_group ? "👥" : (convName || "?").charAt(0).toUpperCase()}
                         </div>
                       )}
                       {/* Placeholder for online status if needed */}
-                      <span className="gt-online-indicator"></span>
+                      {!conversation.is_group && <span className="gt-online-indicator"></span>}
                     </div>
                     <div className="gt-conv-details">
                       <div className="gt-conv-header">
-                        <span className="gt-conv-name">{otherUser?.fname || "Unknown"}</span>
+                        <span className="gt-conv-name">{convName}</span>
                         <span className="gt-conv-time">
                           {conversation.lastMessage?.createdAt 
                             ? new Date(conversation.lastMessage.createdAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) 
@@ -161,15 +166,21 @@ const FreelanceInbox = () => {
                     <AiOutlineArrowLeft size={24} />
                   </button>
                   <div className="gt-avatar-wrap">
-                    {activeUser?.image ? (
-                      <img src={activeUser.image} alt={activeUser.fname} className="gt-avatar" />
+                    {activeImage ? (
+                      <img src={activeImage} alt={activeName} className="gt-avatar" />
                     ) : (
-                      <div className="gt-avatar-placeholder">{(activeUser?.fname || "?").charAt(0).toUpperCase()}</div>
+                      <div className="gt-avatar-placeholder" style={selectedConversation?.is_group ? { background: '#10b981', color: '#fff' } : {}}>
+                        {selectedConversation?.is_group ? "👥" : (activeName || "?").charAt(0).toUpperCase()}
+                      </div>
                     )}
                   </div>
                   <div className="gt-header-info">
-                    <h3 className="gt-header-name">{activeUser?.fname || "Unknown"}</h3>
-                    <p className="gt-header-status">Click here for contact info</p>
+                    <h3 className="gt-header-name">{activeName}</h3>
+                    <p className="gt-header-status">
+                      {selectedConversation?.is_group 
+                        ? selectedConversation.participants?.map(p => `${p.fname} (${p.role || 'User'})`).join(', ')
+                        : "Click here for contact info"}
+                    </p>
                   </div>
                 </div>
                 <div className="gt-header-actions">
@@ -199,11 +210,29 @@ const FreelanceInbox = () => {
             <button className="gt-close-btn" onClick={toggleProfile}>
               <AiOutlineClose size={24} />
             </button>
-            <h4>Contact Info</h4>
+            <h4>{selectedConversation?.is_group ? "Group Info" : "Contact Info"}</h4>
           </div>
           
           <div className="gt-profile-body">
-            {activeUser ? (
+            {selectedConversation?.is_group ? (
+              <div className="gt-profile-card">
+                <div className="gt-profile-avatar-large-wrap">
+                  <div className="gt-avatar-placeholder-large" style={{ background: '#10b981', color: '#fff', fontSize: '32px' }}>👥</div>
+                </div>
+                <h2 className="gt-profile-name-large">{selectedConversation.title}</h2>
+                <p className="gt-profile-role">Group Chat</p>
+                
+                <div className="gt-profile-details-list">
+                  <h5 className="mt-4 mb-2 text-start font-weight-bold" style={{ fontSize: '14px', color: 'var(--inbox-text-main)' }}>Group Members ({selectedConversation.participants?.length || 0})</h5>
+                  {selectedConversation.participants?.map((participant) => (
+                    <div key={participant.id} className="gt-profile-detail-item" style={{ borderBottom: '1px solid var(--inbox-border)', paddingBottom: '8px' }}>
+                      <span className="gt-detail-label" style={{ fontWeight: '600' }}>{participant.fname} {participant.lname || ""}</span>
+                      <span className="gt-detail-value" style={{ textTransform: 'capitalize', color: 'var(--inbox-primary)' }}>{participant.role || "member"}</span>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            ) : activeUser ? (
               <div className="gt-profile-card">
                 <div className="gt-profile-avatar-large-wrap">
                   {activeUser?.image ? (

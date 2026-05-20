@@ -58,10 +58,15 @@ export const fetchConversations = createAsyncThunk(
 
 export const fetchMessages = createAsyncThunk(
   "message/fetchMessages",
-  async ({ receiverId, silent = false }, { rejectWithValue }) => {
+  async ({ receiverId, conversationId, silent = false }, { rejectWithValue }) => {
     try {
       const accessToken = localStorage.getItem("accessToken");
-      const params = receiverId ? `?receiver_id=${receiverId}` : "";
+      let params = "";
+      if (conversationId) {
+        params = `?conversation_id=${conversationId}`;
+      } else if (receiverId) {
+        params = `?receiver_id=${receiverId}`;
+      }
       const res = await axios.get(`/messages${params}`, {
         headers: {
           Authorization: `Bearer ${accessToken}`,
@@ -82,9 +87,31 @@ export const sendMessage = createAsyncThunk(
     try {
       const accessToken = localStorage.getItem("accessToken");
       const formData = new FormData();
-      formData.append("message_type", payload.message_type);
-      formData.append("message", payload.message);
-      formData.append("receiver_id", payload.receiver_id);
+      
+      if (payload.message_type) {
+        formData.append("message_type", payload.message_type);
+      } else {
+        formData.append("message_type", "text");
+      }
+
+      if (payload.message !== undefined) {
+        formData.append("message", payload.message);
+      } else if (payload.content !== undefined) {
+        formData.append("message", payload.content);
+      }
+
+      if (payload.conversationId) {
+        formData.append("conversation_id", payload.conversationId);
+      } else if (payload.conversation_id) {
+        formData.append("conversation_id", payload.conversation_id);
+      }
+
+      if (payload.receiver_id) {
+        formData.append("receiver_id", payload.receiver_id);
+      } else if (payload.receiverId) {
+        formData.append("receiver_id", payload.receiverId);
+      }
+
       if (payload.offer_id) {
         formData.append("offer_id", payload.offer_id);
       }
@@ -415,6 +442,22 @@ const messageSlice = createSlice({
       }
     },
 
+    deleteMessageLocally: (state, action) => {
+      const { messageId, deleteType } = action.payload;
+      if (deleteType === 'everyone') {
+        const msg = state.messages.find(m => String(m.id) === String(messageId));
+        if (msg) {
+          msg.message = "🚫 This message was deleted";
+          msg.file_path = null;
+          msg.file_name = null;
+          msg.file_size = null;
+          msg.message_type = 'deleted';
+        }
+      } else {
+        state.messages = state.messages.filter(m => String(m.id) !== String(messageId));
+      }
+    },
+
     clearMessages: (state) => {
       state.messages = [];
     },
@@ -630,7 +673,7 @@ export const {
   clearTypingUser,
   updateUserOnlineStatus,
   markMessagesAsReadByUser,
-
+  deleteMessageLocally,
 } = messageSlice.actions;
 
 export default messageSlice.reducer;

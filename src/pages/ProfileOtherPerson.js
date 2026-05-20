@@ -360,6 +360,11 @@ const ProfileOtherPerson = () => {
                     {userGigs.gigs.length} Active Gigs
                   </span>
                 )}
+                {userGigs?.orders_in_queue !== undefined && userGigs.orders_in_queue > 0 && (
+                  <span className="dp-badge" style={{ borderColor: 'var(--primary-orange)', color: 'var(--pure-white)', backgroundColor: 'rgba(240, 89, 31, 0.15)', fontWeight: '600' }}>
+                    {userGigs.orders_in_queue} {userGigs.orders_in_queue === 1 ? "Order" : "Orders"} in Queue
+                  </span>
+                )}
               </div>
             </div>
           </div>
@@ -504,11 +509,18 @@ const ProfileOtherPerson = () => {
                               <h3 className="dp-gig-title">{value.title}</h3>
                               <p className="dp-gig-desc">{stripHtmlTags(value.description)}</p>
                               <div className="dp-gig-footer">
-                                <div className="d-flex align-items-center gap-1">
-                                  <AiFillStar size={16} color="var(--primary-orange)" />
-                                  <span className="fw-medium" style={{ color: 'var(--pure-white)', fontSize: '14px' }}>
-                                    {value.average_rating || "5.0"}
-                                  </span>
+                                <div className="d-flex align-items-center gap-2">
+                                  <div className="d-flex align-items-center gap-1">
+                                    <AiFillStar size={16} color="var(--primary-orange)" />
+                                    <span className="fw-medium" style={{ color: 'var(--pure-white)', fontSize: '14px' }}>
+                                      {value.average_rating || "5.0"}
+                                    </span>
+                                  </div>
+                                  {value.orders_in_queue !== undefined && value.orders_in_queue > 0 && (
+                                    <span className="badge rounded-pill px-2 py-1 font-11 fw-semibold" style={{ backgroundColor: 'rgba(240, 89, 31, 0.15)', color: '#f0591f', border: '1px solid rgba(240, 89, 31, 0.3)' }}>
+                                      {value.orders_in_queue} {value.orders_in_queue === 1 ? "Order" : "Orders"} in queue
+                                    </span>
+                                  )}
                                 </div>
                                 <div className="text-end">
                                   <span className="d-block" style={{ color: 'var(--body-gray-text)', fontSize: '11px', textTransform: 'uppercase', letterSpacing: '0.5px' }}>Starting at</span>

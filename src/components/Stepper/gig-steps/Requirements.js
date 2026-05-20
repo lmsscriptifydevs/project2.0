@@ -17,11 +17,6 @@ import {
 } from "@mui/material";
 import React, { useEffect, useState } from "react";
 
-// Constants for validation
-const REQUIREMENT_MIN_CHARS = 5;
-const REQUIREMENT_MAX_CHARS = 2000;
-const MAX_REQUIREMENTS = 10;
-
 const Requirements = ({
   formData = {},
   updateFormData,
@@ -47,41 +42,16 @@ const Requirements = ({
 
   const requirements = formData.requirements || [];
 
-  // Clean requirement text - handle newlines and special characters
-  const cleanRequirementText = (text) => {
-    return text
-      .trim()
-      .replace(/\r\n/g, '\n') // Normalize Windows newlines
-      .replace(/\r/g, '\n') // Normalize old Mac newlines
-      .replace(/\n{3,}/g, '\n\n') // Max 2 consecutive newlines
-      .replace(/[^\S\n]+/g, ' ') // Replace multiple spaces (not newlines) with single space
-      .substring(0, REQUIREMENT_MAX_CHARS); // Enforce max length
-  };
-
   const handleAddRequirement = () => {
-    const cleanedText = cleanRequirementText(newRequirement);
-    
-    if (cleanedText && requirements.length < MAX_REQUIREMENTS) {
-      if (cleanedText.length < REQUIREMENT_MIN_CHARS) {
-        setLocalValidationErrors({ 
-          newRequirement: `Minimum ${REQUIREMENT_MIN_CHARS} characters required` 
-        });
+    if (newRequirement.trim() && requirements.length < 10) {
+      const requirementText = newRequirement.trim();
+
+      if (requirementText.length < 5) {
+        setLocalValidationErrors({ newRequirement: "Minimum 5 characters required" });
         return;
       }
 
-      // Check for duplicate requirements
-      const isDuplicate = requirements.some(
-        req => req.toLowerCase() === cleanedText.toLowerCase()
-      );
-      
-      if (isDuplicate) {
-        setLocalValidationErrors({ 
-          newRequirement: "This requirement already exists" 
-        });
-        return;
-      }
-
-      updateFormData({ requirements: [...requirements, cleanedText] });
+      updateFormData({ requirements: [...requirements, requirementText] });
       setNewRequirement("");
       setLocalValidationErrors({});
     }
@@ -96,25 +66,6 @@ const Requirements = ({
       e.preventDefault();
       handleAddRequirement();
     }
-  };
-
-  // Handle input change with max length enforcement
-  const handleInputChange = (e) => {
-    const value = e.target.value;
-    // Allow typing but show warning when approaching limit
-    setNewRequirement(value);
-    if (localValidationErrors.newRequirement) {
-      setLocalValidationErrors({});
-    }
-  };
-
-  // Get character count color
-  const getCharCountColor = () => {
-    const len = newRequirement.trim().length;
-    if (len === 0) return theme.bodyGrayText;
-    if (len < REQUIREMENT_MIN_CHARS) return theme.primaryOrange;
-    if (len > REQUIREMENT_MAX_CHARS) return "#ef4444";
-    return "#4caf50";
   };
 
   // Reusable TextField Style for Dark Theme
@@ -150,81 +101,38 @@ const Requirements = ({
         </Typography>
       </Box>
 
-      {allErrors.requirements && (
-        <Alert severity="error" variant="outlined" sx={{ 
-          mb: 3, 
-          color: '#ff5252', 
-          borderColor: '#ff5252', 
-          bgcolor: 'rgba(255, 82, 82, 0.05)',
-          animation: 'shake 0.5s ease-in-out',
-          '@keyframes shake': {
-            '0%, 100%': { transform: 'translateX(0)' },
-            '10%, 30%, 50%, 70%, 90%': { transform: 'translateX(-5px)' },
-            '20%, 40%, 60%, 80%': { transform: 'translateX(5px)' },
-          }
-        }}>
-          <strong>⚠️ Required:</strong> {allErrors.requirements}
-        </Alert>
-      )}
-
       {/* Input Card */}
       <Card sx={{ 
         mb: 4, 
         bgcolor: theme.cardBg, 
-        border: allErrors.requirements 
-          ? '2px solid #ef4444' 
-          : `1px solid ${theme.lightBorder}`,
+        border: `1px solid ${theme.lightBorder}`,
         borderRadius: 3,
-        overflow: 'visible',
-        animation: allErrors.requirements ? 'shake 0.5s ease-in-out' : 'none',
-        '@keyframes shake': {
-          '0%, 100%': { transform: 'translateX(0)' },
-          '10%, 30%, 50%, 70%, 90%': { transform: 'translateX(-5px)' },
-          '20%, 40%, 60%, 80%': { transform: 'translateX(5px)' },
-        },
-        transition: 'border-color 0.3s ease',
+        overflow: 'visible'
       }}>
         <CardContent sx={{ p: 3 }}>
           <Typography variant="subtitle2" sx={{ color: theme.mediumGrayTitle, mb: 2, display: 'flex', alignItems: 'center', gap: 1 }}>
-            <AssignmentTurnedIn sx={{ fontSize: 18, color: allErrors.requirements ? '#ef4444' : theme.primaryOrange }} />
-            Nayi Requirement Add Karein (Min: {REQUIREMENT_MIN_CHARS} chars, Max: {REQUIREMENT_MAX_CHARS} chars)
-            {allErrors.requirements && (
-              <span style={{ color: '#ef4444', fontSize: '12px', marginLeft: '8px' }}>* Required</span>
-            )}
+            <AssignmentTurnedIn sx={{ fontSize: 18, color: theme.primaryOrange }} />
+            Nayi Requirement Add Karein (Min: 5 chars, Max: 2000 chars)
           </Typography>
           
           <Box sx={{ display: "flex", gap: 2, alignItems: 'flex-start' }}>
             <TextField
               fullWidth
-              multiline
-              rows={3}
               value={newRequirement}
-              onChange={handleInputChange}
+              onChange={(e) => {
+                setNewRequirement(e.target.value);
+                if (localValidationErrors.newRequirement) setLocalValidationErrors({});
+              }}
               onKeyPress={handleKeyPress}
               placeholder="e.g., Please send your brand logo and color preferences..."
               error={!!allErrors.newRequirement || !!allErrors.requirements}
-              helperText={allErrors.newRequirement || allErrors.requirements || `Minimum ${REQUIREMENT_MIN_CHARS} characters required`}
-              inputProps={{
-                maxLength: REQUIREMENT_MAX_CHARS + 50, // Allow slight overflow for better UX
-              }}
-              sx={{
-                ...textFieldStyle,
-                '& .MuiOutlinedInput-root': {
-                  color: theme.pureWhite,
-                  bgcolor: 'rgba(255, 255, 255, 0.01)',
-                  '& fieldset': { 
-                    borderColor: allErrors.requirements ? '#ef4444' : theme.lightBorder,
-                    borderWidth: allErrors.requirements ? '2px' : '1px',
-                  },
-                  '&:hover fieldset': { borderColor: allErrors.requirements ? '#ef4444' : 'rgba(255, 255, 255, 0.15)' },
-                  '&.Mui-focused fieldset': { borderColor: allErrors.requirements ? '#ef4444' : theme.primaryOrange },
-                },
-              }}
+              helperText={allErrors.newRequirement || allErrors.requirements || "Minimum 5 characters"}
+              sx={textFieldStyle}
             />
             <Button
               variant="contained"
               onClick={handleAddRequirement}
-              disabled={!newRequirement.trim() || newRequirement.trim().length < REQUIREMENT_MIN_CHARS || requirements.length >= MAX_REQUIREMENTS}
+              disabled={!newRequirement.trim() || requirements.length >= 10}
               startIcon={<Add />}
               sx={{ 
                 height: '56px',
@@ -241,25 +149,16 @@ const Requirements = ({
           </Box>
 
           {newRequirement && (
-            <Box sx={{ mt: 1, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-              <Typography
-                variant="caption"
-                sx={{ 
-                  color: getCharCountColor(),
-                  fontWeight: 600
-                }}
-              >
-                {newRequirement.trim().length}/{REQUIREMENT_MAX_CHARS} characters
-                {newRequirement.trim().length < REQUIREMENT_MIN_CHARS && ` (Need ${REQUIREMENT_MIN_CHARS - newRequirement.trim().length} more)`}
-                {newRequirement.trim().length >= REQUIREMENT_MIN_CHARS && newRequirement.trim().length <= REQUIREMENT_MAX_CHARS && " ✓"}
-                {newRequirement.trim().length > REQUIREMENT_MAX_CHARS && " ⚠️ Too long!"}
-              </Typography>
-              {requirements.length >= MAX_REQUIREMENTS && (
-                <Typography variant="caption" sx={{ color: "#ef4444" }}>
-                  Maximum {MAX_REQUIREMENTS} requirements reached
-                </Typography>
-              )}
-            </Box>
+            <Typography
+              variant="caption"
+              sx={{ 
+                display: "block", 
+                mt: 1, 
+                color: newRequirement.length >= 5 ? "#4caf50" : theme.primaryOrange 
+              }}
+            >
+              {newRequirement.length}/2000 characters {newRequirement.length >= 5 ? "✓" : "(Min. 5 needed)"}
+            </Typography>
           )}
         </CardContent>
       </Card>
@@ -273,7 +172,7 @@ const Requirements = ({
         }}>
           <Box sx={{ p: 2, borderBottom: `1px solid ${theme.lightBorder}`, bgcolor: 'rgba(255,255,255,0.01)' }}>
             <Typography variant="subtitle1" sx={{ color: theme.pureWhite, fontWeight: 'bold' }}>
-              Added Requirements ({requirements.length}/{MAX_REQUIREMENTS}) — Max: {MAX_REQUIREMENTS} requirements
+              Added Requirements ({requirements.length}/10) — Max: 10 requirements
             </Typography>
           </Box>
           <List sx={{ p: 0 }}>
