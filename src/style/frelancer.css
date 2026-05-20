@@ -1,0 +1,29 @@
+.frelancer-ofcanva-text {
+  background-color: #ed5623;
+  border-top-left-radius: 12px;
+  border-top-right-radius: 12px;
+  color: white;
+}
+
+.About-Seller-Rating label {
+  font-size: 12px;
+}
+.About-Seller-Rating label .MuiRating-iconEmpty {
+  color: rgb(124, 124, 124) !important;
+}
+.About-Seller-Rating label .MuiRating-iconFilled {
+  color: #ed5623 !important;
+}
+.About-Seller-Rating label svg {
+  width: 20px !important;
+  height: 20px !important;
+}
+
+.preloder {
+  position: absolute;
+  width: 100%;
+  height: 100vh;
+  overflow: hidden;
+  z-index: 15;
+  background: white;
+}/*# sourceMappingURL=frelancer.css.map */

@@ -1,0 +1,279 @@
+.footer-page-theme {
+  min-height: 100vh;
+  background: #020617;
+  color: #f8fafc;
+}
+
+.footer-page-theme section {
+  background: transparent;
+  color: #f8fafc;
+}
+
+.footer-page-theme .bg-light,
+.footer-page-theme .bg-white,
+.footer-page-theme .bg-white.bg-opacity-10 {
+  background: rgba(255, 255, 255, 0.03) !important;
+  color: #e2e8f0 !important;
+}
+
+.footer-page-theme .card,
+.footer-page-theme .accordion-item,
+.footer-page-theme .list-group-item,
+.footer-page-theme .contact-card,
+.footer-page-theme .value-card,
+.footer-page-theme .team-card,
+.footer-page-theme .security-card,
+.footer-page-theme .support-card,
+.footer-page-theme .category-card,
+.footer-page-theme .badge-card,
+.footer-page-theme .policy-link,
+.footer-page-theme .feature-card,
+.footer-page-theme .hero-gradient,
+.footer-page-theme .form-animate,
+.footer-page-theme .card.border-0.shadow-sm {
+  background: rgba(255, 255, 255, 0.02) !important;
+  border-color: rgba(255, 255, 255, 0.08) !important;
+  color: #e2e8f0 !important;
+}
+
+.footer-page-theme .card-body,
+.footer-page-theme .accordion-body,
+.footer-page-theme .accordion-button,
+.footer-page-theme .text-muted,
+.footer-page-theme .lead,
+.footer-page-theme p,
+.footer-page-theme small,
+.footer-page-theme li,
+.footer-page-theme span,
+.footer-page-theme .list-unstyled li,
+.footer-page-theme .badge,
+.footer-page-theme .policy-link,
+.footer-page-theme .support-card .card-body,
+.footer-page-theme .security-card .card-body,
+.footer-page-theme .category-card .card-body,
+.footer-page-theme .contact-card .card-body {
+  color: rgba(255, 255, 255, 0.82) !important;
+}
+
+.footer-page-theme .container-fluid,
+.footer-page-theme .container {
+  background-color: transparent !important;
+}
+
+.footer-page-theme .faq-item,
+.footer-page-theme .benefit-card,
+.footer-page-theme .support-card,
+.footer-page-theme .category-card,
+.footer-page-theme .team-card,
+.footer-page-theme .cookie-card,
+.footer-page-theme .value-card,
+.footer-page-theme .security-card,
+.footer-page-theme .feature-card,
+.footer-page-theme .form-animate,
+.footer-page-theme .card.border-0.shadow-sm {
+  background: rgba(255, 255, 255, 0.02) !important;
+  border-color: rgba(255, 255, 255, 0.08) !important;
+  color: rgba(255, 255, 255, 0.82) !important;
+}
+
+.footer-page-theme .faq-question,
+.footer-page-theme .faq-answer,
+.footer-page-theme .faq-answer p,
+.footer-page-theme .cocon,
+.footer-page-theme .poppins,
+.footer-page-theme .font-18,
+.footer-page-theme .font-24,
+.footer-page-theme .font-28,
+.footer-page-theme .font-30,
+.footer-page-theme .font-38,
+.footer-page-theme .text-center,
+.footer-page-theme .text-start,
+.footer-page-theme .row,
+.footer-page-theme .col-lg-10,
+.footer-page-theme .col-lg-11,
+.footer-page-theme .col-12 {
+  color: #e2e8f0 !important;
+}
+
+.footer-page-theme .faq-item:hover,
+.footer-page-theme .benefit-card:hover,
+.footer-page-theme .team-card:hover,
+.footer-page-theme .support-card:hover,
+.footer-page-theme .category-card:hover {
+  background: rgba(255, 255, 255, 0.04) !important;
+  border-color: rgba(240, 89, 31, 0.4) !important;
+}
+
+.footer-page-theme h1,
+.footer-page-theme h2,
+.footer-page-theme h3,
+.footer-page-theme h4,
+.footer-page-theme h5,
+.footer-page-theme h6,
+.footer-page-theme .display-4,
+.footer-page-theme .display-5,
+.footer-page-theme .display-6 {
+  color: #ffffff !important;
+}
+
+.footer-page-theme a,
+.footer-page-theme .btn-link,
+.footer-page-theme .policy-link {
+  color: #f0591f !important;
+}
+
+.footer-page-theme .btn,
+.footer-page-theme .btn-primary,
+.footer-page-theme .btn-bounce,
+.footer-page-theme .btn-shine,
+.footer-page-theme .btn-gradient,
+.footer-page-theme .btn-outline-custom,
+.footer-page-theme .btn-outline-custom:hover {
+  background: #f0591f !important;
+  color: #ffffff !important;
+  border-color: transparent !important;
+}
+
+.footer-page-theme .btn:hover,
+.footer-page-theme .btn:focus {
+  filter: brightness(1.05);
+}
+
+.footer-page-theme .btn-white,
+.footer-page-theme .btn-outline-custom:not(.active) {
+  background: rgba(255, 255, 255, 0.08) !important;
+  color: #f8fafc !important;
+  border-color: rgba(255, 255, 255, 0.14) !important;
+}
+
+.footer-page-theme .form-control,
+.footer-page-theme .form-select,
+.footer-page-theme .input-group .form-control,
+.footer-page-theme .input-group .form-select,
+.footer-page-theme textarea,
+.footer-page-theme input {
+  background: rgba(255, 255, 255, 0.04) !important;
+  border: 1px solid rgba(255, 255, 255, 0.12) !important;
+  color: #f8fafc !important;
+}
+
+.footer-page-theme .form-control:focus,
+.footer-page-theme .form-select:focus,
+.footer-page-theme textarea:focus,
+.footer-page-theme input:focus {
+  background: rgba(255, 255, 255, 0.06) !important;
+  border-color: rgba(240, 89, 31, 0.8) !important;
+  box-shadow: none !important;
+  color: #ffffff !important;
+}
+
+.footer-page-theme .accordion-button {
+  background: rgba(255, 255, 255, 0.04) !important;
+  border: 1px solid rgba(255, 255, 255, 0.08) !important;
+  color: #f8fafc !important;
+}
+
+.footer-page-theme .accordion-button:not(.collapsed) {
+  background: rgba(255, 255, 255, 0.06) !important;
+}
+
+.footer-page-theme .accordion-body {
+  background: transparent !important;
+}
+
+.footer-page-theme .badge {
+  background: rgba(240, 89, 31, 0.14) !important;
+  color: #f59b76 !important;
+}
+
+.footer-page-theme .bg-warning {
+  background: rgba(240, 89, 31, 0.18) !important;
+  color: #f7c6a3 !important;
+}
+
+.footer-page-theme .text-success {
+  color: #5eead4 !important;
+}
+
+.footer-page-theme .card .btn,
+.footer-page-theme .card .btn:hover {
+  background: #f0591f !important;
+  color: #ffffff !important;
+}
+
+.footer-page-theme .icon-size,
+.footer-page-theme .category-icon,
+.footer-page-theme .contact-icon,
+.footer-page-theme .value-icon,
+.footer-page-theme .team-icon,
+.footer-page-theme .security-icon,
+.footer-page-theme .support-icon {
+  color: #f0591f !important;
+}
+
+.footer-page-theme .text-muted {
+  color: rgba(255, 255, 255, 0.65) !important;
+}
+
+.footer-page-theme .bg-light:hover,
+.footer-page-theme .card:hover,
+.footer-page-theme .support-card:hover,
+.footer-page-theme .value-card:hover,
+.footer-page-theme .team-card:hover,
+.footer-page-theme .category-card:hover {
+  background: rgba(255, 255, 255, 0.06) !important;
+}
+
+.footer-page-theme .container {
+  position: relative;
+}
+
+.footer-page-theme .hero-gradient,
+.footer-page-theme .safety-bg,
+.footer-page-theme .image-glow,
+.footer-page-theme .cta-gradient {
+  background: rgba(255, 255, 255, 0.04) !important;
+}
+
+.footer-page-theme .footer,
+.footer-page-theme .navbar,
+.footer-page-theme .navbar-nav .nav-link {
+  background: transparent !important;
+  color: #f8fafc !important;
+}
+
+.footer-page-theme .navbar .nav-link:hover,
+.footer-page-theme .navbar .nav-link.active {
+  color: #f0591f !important;
+}
+
+.footer-page-theme .breadcrumb-item a,
+.footer-page-theme .breadcrumb-item.active {
+  color: rgba(255, 255, 255, 0.7) !important;
+}
+
+.footer-page-theme .text-dark,
+.footer-page-theme .text-black {
+  color: #f8fafc !important;
+}
+
+.footer-page-theme .bg-transparent,
+.footer-page-theme .bg-body {
+  background: transparent !important;
+}
+
+.footer-page-theme .lead,
+.footer-page-theme .display-4,
+.footer-page-theme .display-5,
+.footer-page-theme .display-6,
+.footer-page-theme .fw-bold {
+  color: #ffffff !important;
+}
+
+.footer-page-theme .text-center a.btn {
+  margin: 0.25rem;
+}
+
+.footer-page-theme .image-glow::before {
+  background: radial-gradient(circle at center, rgba(240, 89, 31, 0.15), transparent 60%) !important;
+}

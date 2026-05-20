@@ -1,0 +1,18 @@
+.appeptjob{
+    box-shadow: 0px -2px 31px 0px #0000001A;
+    padding: 10px;
+    border-radius: 10px;
+}
+.appept{
+    background-color: #F5F5FF;
+}
+.jobprogress{
+    background: #ed5623;
+    color: #FFFFFF;
+}
+.bonous{
+    color: #FFFFFF;
+    background: #9300F5;
+    box-shadow: 0px 2px 4px 0px #00000013;
+
+}

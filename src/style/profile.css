@@ -1,0 +1,177 @@
+.profileSetting .Modal-verification .modal-content {
+  border: 1px solid #ed5623;
+}
+.profileSetting .otp > div {
+  justify-content: center !important;
+}
+.profileSetting .otp input {
+  width: 60px !important;
+  height: 50px !important;
+  font-weight: 500 !important;
+}
+.profileSetting .otp input:focus {
+  border: 1px solid #ed5623 !important;
+}
+.profileSetting .prof-fields input {
+  box-shadow: 0px 6px 6px 0px rgba(0, 0, 0, 0.1) !important;
+  color: #667085 !important;
+}
+.profileSetting .prof-fields input:focus {
+  color: #667085 !important;
+  border: 1px solid #ed5623 !important;
+}
+.profileSetting .prof-fields input::-moz-placeholder {
+  color: #667085 !important;
+  opacity: 40% !important;
+}
+.profileSetting .prof-fields input::placeholder {
+  color: #667085 !important;
+  opacity: 40% !important;
+}
+.profileSetting .prof-fields .textArea {
+  box-shadow: 0px 6px 6px 0px rgba(0, 0, 0, 0.1) !important;
+  color: #667085 !important;
+}
+.profileSetting .prof-fields .textArea:focus {
+  color: #667085 !important;
+  border: 1px solid #ed5623 !important;
+}
+.profileSetting .prof-fields .textArea::-moz-placeholder {
+  color: #667085 !important;
+  opacity: 40% !important;
+}
+.profileSetting .prof-fields .textArea::placeholder {
+  color: #667085 !important;
+  opacity: 40% !important;
+}
+.profileSetting .prof-fields select {
+  box-shadow: 0px 6px 6px 0px rgba(0, 0, 0, 0.1) !important;
+  color: #333333 !important;
+}
+.profileSetting .prof-fields select:focus {
+  color: #333333 !important;
+  border: 1px solid #ed5623 !important;
+}
+.profileSetting .prof-fields select::-moz-placeholder {
+  color: #333333 !important;
+}
+.profileSetting .prof-fields select::placeholder {
+  color: #333333 !important;
+}
+.profileSetting .prof-fields .phone-number .PhoneInput {
+  box-shadow: 0px 6px 6px 0px rgba(0, 0, 0, 0.1019607843) !important;
+  border-radius: 8px;
+}
+.profileSetting .prof-fields .phone-number div[aria-hidden=true] {
+  margin-right: 8px;
+}
+.profileSetting .prof-fields .phone-number .PhoneInputCountry {
+  padding: 12px 10px;
+  border: 1px solid #D0D0D0;
+  border-top-left-radius: 8px;
+  border-bottom-left-radius: 8px;
+}
+.profileSetting .prof-fields .phone-number input {
+  padding: 12px 10px;
+  border: none !important;
+  box-shadow: none !important;
+}
+.profileSetting .prof-fields .phone-number input:focus {
+  border: none !important;
+}
+.profileSetting .prof-fields .phone-number input:focus-visible {
+  border: none !important;
+  outline: none !important;
+}
+.profileSetting .highT {
+  height: 100%;
+  border-right: 1px solid #BBBBBB;
+}
+.profileSetting .side-bar-tabs li {
+  cursor: pointer;
+  color: #404040 !important;
+  border-bottom: 1px solid #BBBBBB;
+}
+.profileSetting .side-bar-tabs li.active {
+  color: #ed5623 !important;
+}
+.profileSetting .profile-upload {
+  border: 2px solid #ed5623;
+  border-radius: 4px;
+  color: #ed5623;
+  background-color: transparent;
+}
+
+.profile-upload > div > div {
+  /* Track */
+  /* Handle */
+}
+.profile-upload > div > div ::-webkit-scrollbar {
+  width: 10px;
+  height: 10px;
+}
+.profile-upload > div > div ::-webkit-scrollbar-track {
+  background: rgb(238, 238, 238);
+}
+.profile-upload > div > div ::-webkit-scrollbar-thumb {
+  background: #ed5623;
+  border-radius: 10px;
+}
+.profile-upload > div > div > div {
+  width: 100% !important;
+  overflow: auto !important;
+}
+
+.sidebar-profile ::-webkit-scrollbar {
+  width: 0px;
+  height: 0px;
+}
+.sidebar-profile .modal-content {
+  border: 1px solid #ed5623;
+  position: relative;
+}
+.sidebar-profile .image-upload-after {
+  position: absolute;
+}
+.sidebar-profile .delet-current-img {
+  border: none;
+  background-color: transparent;
+  color: #ed5623;
+  border-bottom: 2px solid #ed5623;
+  font-weight: 500;
+}
+.sidebar-profile .zoom-slider > span span:first-child {
+  background-color: #D4D4D4 !important;
+  opacity: 1 !important;
+}
+.sidebar-profile .zoom-slider > span span:nth-child(2) {
+  background-color: #ed5623 !important;
+  opacity: 1 !important;
+  height: 5px;
+}
+.sidebar-profile .zoom-slider > span span[aria-hidden=true] {
+  display: none;
+}
+.sidebar-profile .zoom-slider > span span[data-index] {
+  display: none;
+}
+.sidebar-profile .zoom-slider > span span:last-child {
+  display: block;
+  background-color: #ed5623;
+}
+.sidebar-profile .zoom-slider > span span:last-child > span {
+  display: none;
+}
+
+@media (max-width: 992px) {
+  .highT {
+    border-right: none;
+  }
+}
+@media (max-width: 768px) {
+  .sidebar-profile .image-upload-after {
+    position: relative;
+    bottom: 0 !important;
+    right: 0 !important;
+  }
+}/*# sourceMappingURL=profile.css.map */

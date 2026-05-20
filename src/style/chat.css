@@ -1,0 +1,399 @@
+.cahting .todayChat span {
+  background-color: #d6dade;
+  border-radius: 8px;
+}
+.cahting .card {
+  box-shadow: 0px -2px 10px 0px rgba(0, 0, 0, 0.0784313725);
+  border: none;
+  border-radius: 12px !important;
+}
+.cahting .type_msg {
+  border: 0 !important;
+  color: white;
+  height: 60px !important;
+  overflow-y: auto;
+}
+.cahting .type_msg:focus {
+  box-shadow: none !important;
+  outline: 0px !important;
+}
+.cahting .send_btn {
+  border-radius: 50% !important;
+  padding: 5px;
+  background-color: #ffd104 !important;
+  border: 0 !important;
+  color: white !important;
+  cursor: pointer;
+}
+.cahting .user_img_msg {
+  height: 50px;
+  width: 50px;
+  -webkit-clip-path: circle(50%);
+  clip-path: circle(50%);
+}
+.cahting .video_cam {
+  margin-left: 50px;
+  margin-top: 5px;
+}
+.cahting .video_cam span {
+  color: white;
+  font-size: 20px;
+  cursor: pointer;
+  margin-right: 20px;
+}
+.cahting .msg_cotainer {
+  margin-left: 10px;
+  color: #667085;
+}
+.cahting input:focus {
+  color: black;
+}
+.cahting .msg_cotainer_send {
+  margin-left: 10px;
+  color: #667085;
+}
+.cahting .msg_time {
+  font-size: 10px;
+  color: #4d5b62;
+}
+.cahting .msg_head {
+  position: relative;
+}
+.cahting #action_menu_btn {
+  position: absolute;
+  right: 10px;
+  top: 10px;
+  color: #f69110;
+  cursor: pointer;
+  font-size: 20px;
+}
+.cahting .action_menu {
+  z-index: 1;
+  position: absolute;
+  padding: 15px 0;
+  background-color: rgba(0, 0, 0, 0.5);
+  color: white;
+  border-radius: 15px;
+  top: 30px;
+  right: 15px;
+  display: none;
+}
+.cahting .action_menu ul {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+}
+.cahting .action_menu ul li {
+  width: 100%;
+  padding: 10px 15px;
+  margin-bottom: 5px;
+}
+.cahting .action_menu ul li i {
+  padding-right: 10px;
+}
+.cahting .action_menu ul li:hover {
+  cursor: pointer;
+  background-color: rgba(143, 57, 57, 0.2);
+}
+.cahting .scroll {
+  overflow-y: auto;
+  scrollbar-width: thin;
+}
+.cahting input {
+  background-color: transparent;
+  border: 0 !important;
+  color: black;
+}
+.cahting input:focus {
+  background-color: transparent;
+  box-shadow: none !important;
+}
+.cahting .input-group:focus-within {
+  box-shadow: none !important;
+}
+.cahting .btn-snd {
+  outline: none;
+  border: none;
+  background-color: transparent;
+  color: #667085;
+}
+
+.chat-input span {
+  background-color: transparent !important;
+  border-right: none !important;
+}
+.chat-input input {
+  border-left: none !important;
+}
+
+.mobile-side-properties {
+  top: 15%;
+  z-index: 99;
+}
+.mobile-side-properties div {
+  background-color: #32475c;
+  padding: 11px 14px;
+  width: -moz-fit-content;
+  width: fit-content;
+  display: flex;
+  border-top-left-radius: 6px;
+  border-bottom-left-radius: 6px;
+  color: white;
+}
+.mobile-side-properties .spanNumber {
+  position: absolute;
+  top: -10px;
+  left: -7px;
+  background-color: red;
+  border: 1px solid white;
+  border-radius: 50%;
+  /* padding: 0px 5px; */
+  width: 18px;
+  height: 18px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+.mobile-side-properties .buttons-chating {
+  background-color: white !important;
+  position: relative;
+  top: -7px;
+  z-index: -1;
+  box-shadow: 0px 1px 3px 2px rgba(50, 71, 92, 0.0588235294);
+}
+.mobile-side-properties .buttons-chating span {
+  position: absolute;
+  top: -10px;
+  right: -7px;
+  background-color: red;
+  border: 1px solid white;
+  border-radius: 50%;
+  width: 18px;
+  height: 18px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+.mobile-side-properties .buttons-chating div {
+  background-color: black !important;
+  color: white;
+  width: 110px;
+  text-align: center;
+  border-radius: 6px;
+}
+
+.ticket-chat {
+  height: -moz-fit-content;
+  height: fit-content;
+}
+
+.chat-menu-card input {
+  width: 100%;
+}
+.chat-menu-card .avtar {
+  width: 50px !important;
+  height: 50px !important;
+}
+
+.card-footer {
+  background-color: #f5f5ff !important;
+}
+.card-footer input {
+  color: #667085 !important;
+}
+.card-footer input:focus {
+  color: #667085 !important;
+}
+.card-footer .mobile-link {
+  position: absolute;
+  top: -48px;
+  padding: 7px;
+  left: 10px;
+  border-radius: 10px;
+  background: #ed5623;
+}
+.card-footer .mobile-link::after {
+  position: absolute;
+  content: "";
+  border: 11px solid transparent;
+  border-top-color: #ed5623;
+  bottom: -18px;
+  left: 12px;
+}
+.card-footer .mbl-btn-rotate-after {
+  transform: rotate(135deg);
+  background-color: #667085;
+  border: none;
+  color: white;
+  padding: 0px 9px !important;
+  border-radius: 50% !important;
+  font-size: 22px;
+}
+.card-footer .mbl-btn-rotate-befor {
+  background: #ed5623;
+  border: none;
+  color: white;
+  padding: 0px 9px !important;
+  border-radius: 50% !important;
+  font-size: 22px;
+}
+
+.user-msg {
+  background-color: #f5f5ff;
+  border-radius: 8px;
+}
+.user-msg button {
+  background-color: white !important;
+  color: #ed5623 !important;
+  font-family: "Poppins", sans-serif !important;
+  text-transform: capitalize !important;
+}
+
+.my-msg {
+  background-color: transparent;
+  border-radius: 8px;
+}
+
+.msg-time {
+  color: black;
+  font-weight: 400;
+  font-size: 11px;
+}
+
+.msg-length {
+  background: #ed5623;
+  width: 20px;
+  height: 20px;
+  display: flex;
+  font-size: 12px;
+  align-items: center;
+  justify-content: center;
+  color: white;
+  border-radius: 50%;
+}
+
+.credit-lines:before {
+  background-color: #667085;
+  opacity: 50%;
+  content: "";
+  display: inline-block;
+  height: 1.5px;
+  width: -webkit-fill-available;
+}
+
+.credit-lines:after {
+  background-color: #667085;
+  opacity: 50%;
+  content: "";
+  display: inline-block;
+  height: 1.5px;
+  width: -webkit-fill-available;
+}
+
+.call-option {
+  position: absolute;
+  right: 18px;
+  bottom: 70px;
+}
+
+.video-call {
+  background-image: url(../assets//video-call-img.webp);
+  background-position: center;
+  background-size: 100% 100%;
+  height: 100vh;
+  background-repeat: no-repeat;
+}
+
+.video-call-volume {
+  position: absolute;
+  flex-direction: column;
+  display: flex;
+  background: rgba(0, 0, 0, 0.231372549);
+  padding: 14px 12px;
+  bottom: 20px;
+  border-radius: 10px;
+  left: 4%;
+  color: white;
+}
+.video-call-volume > span span:first-child {
+  background-color: #c4c4c4 !important;
+  opacity: 30% !important;
+}
+.video-call-volume > span span:nth-child(2) {
+  background-color: #c4c4c4 !important;
+  opacity: 1 !important;
+  border: 0px solid currentColor !important;
+}
+.video-call-volume > span span:last-child {
+  display: block;
+  background-color: #c4c4c4 !important;
+}
+.video-call-volume > span span:last-child:hover {
+  box-shadow: none !important;
+}
+.video-call-volume > span span:last-child > span {
+  display: none;
+}
+
+.callMuteMicero {
+  position: absolute;
+  bottom: 8px;
+  right: 8px;
+}
+
+@media (max-width: 768px) {
+  .cahting .scroll {
+    height: calc(100vh - 225px) !important;
+  }
+}
+@media (max-width: 576px) {
+  .cahting .msg_time {
+    font-size: 9px;
+  }
+  .cahting .chat-img2 {
+    position: absolute;
+    top: -14px;
+    right: 6px;
+  }
+  .cahting .chat-img1 {
+    position: absolute;
+    top: -25px;
+    left: 4px;
+  }
+  .main-div-chating {
+    background-color: #f6f6f6;
+  }
+  .chat-menu-card input {
+    width: 65%;
+  }
+  .chat-menu-card input::-moz-placeholder {
+    font-size: 10px;
+  }
+  .chat-menu-card input::placeholder {
+    font-size: 10px;
+  }
+  .chat-menu-card .avtar {
+    width: 40px !important;
+    height: 40px !important;
+  }
+}
+@media (max-width: 468px) {
+  .chat-menu-card input {
+    width: 35%;
+  }
+}
+@media (max-width: 428px) {
+  .chat-menu-card > div {
+    width: 50% !important;
+  }
+}
+@media (max-width: 468px) {
+  .msg-time {
+    font-size: 10px;
+  }
+}
+@media (max-width: 375px) {
+  .msg-time {
+    font-size: 9px;
+  }
+} /*# sourceMappingURL=chat.css.map */

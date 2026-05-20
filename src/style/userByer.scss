@@ -1,0 +1,28 @@
+.userByerMain {
+    .userByer {
+        span {
+            padding: 8px 12px;
+            background-color: white !important;
+            margin: 4px;
+        }
+    }
+    .nav-pills .nav-link.active {
+        color:#333333 !important;
+        background-color: transparent !important;
+        border-bottom: 8px solid #ed5623 !important;
+        span{
+            background-color: #ed5623 !important;
+            color: white !important;
+        }
+    }
+    .nav-pills .nav-link {
+        color:#333333 !important;
+        background-color: transparent !important;
+        span{
+            background-color: #F5F5FF !important;
+            color: black !important;
+            padding: 1px 5px !important;
+            font-size: 10px !important;
+        }
+    }
+}
