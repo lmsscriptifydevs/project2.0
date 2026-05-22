@@ -28,6 +28,27 @@ export const useLocalStorageData = (key, defaultValue = null) => {
     } else {
       setTimeout(readValue, 0);
     }
+
+    const handleUpdate = () => {
+      try {
+        const item = localStorage.getItem(key);
+        setValue(item ? JSON.parse(item) : defaultValue);
+      } catch (error) {
+        console.error(`Error updating state for key "${key}":`, error);
+      }
+    };
+
+    if (key === 'UserData') {
+      window.addEventListener('userDataChanged', handleUpdate);
+    }
+    window.addEventListener('storage', handleUpdate);
+
+    return () => {
+      if (key === 'UserData') {
+        window.removeEventListener('userDataChanged', handleUpdate);
+      }
+      window.removeEventListener('storage', handleUpdate);
+    };
   }, [key, defaultValue]);
 
   // Return defaultValue immediately for first render, then actual value

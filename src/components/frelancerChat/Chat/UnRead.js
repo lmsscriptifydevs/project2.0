@@ -4,87 +4,161 @@ import { useUserData } from "../../../utils/useLocalStorage";
 
 const UnRead = ({ conversation, onClick, isSelected, isOnline }) => {
   const currentUser = useUserData();
-  const theme = {
-    pureWhite: "var(--inbox-text-main, #ffffff)",
-    primaryOrange: "var(--inbox-primary, #f0591f)",
-    bodyGray: "var(--inbox-text-light, #71717a)",
-    cardBg: "var(--inbox-hover, rgba(255, 255, 255, 0.03))",
-    lightBorder: "var(--inbox-border, rgba(255, 255, 255, 0.06))"
-  };
 
   const rawUser = conversation?.user;
   const otherUser = rawUser && rawUser.id !== currentUser.id ? rawUser : null;
-  const displayName = conversation?.is_group ? conversation.title : (otherUser ? `${otherUser.fname || ""} ${otherUser.lname || ""}`.trim() : "User");
+  const displayName = conversation?.is_group
+    ? conversation.title
+    : otherUser
+    ? `${otherUser.fname || ""} ${otherUser.lname || ""}`.trim() || otherUser.name || "User"
+    : "User";
+
+  const shouldRedactText = (text) => {
+    if (!text) return false;
+    const normalized = text.toLowerCase();
+    const emailRegex = /[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}/i;
+    if (emailRegex.test(text)) return true;
+    const handleRegex = /@([a-zA-Z0-9._]{2,})/i;
+    if (handleRegex.test(text)) return true;
+    const forbiddenKeywords = ['whatsapp', 'watsap', 'whtsapp', 'whats app', 'wa.me', 'telegram', 'skype', 'imo', 'viber', 'wechat', 'phone number', 'mobile number', 'contact number', 'phone no', 'mobile no', 'number do', 'number de', 'contact karo', 'whatsapp pr', 'whatsapp par', 'whatsapp pe', 'call me', 'contact me on', 'baat karein', 'direct client'];
+    for (const keyword of forbiddenKeywords) {
+      if (normalized.includes(keyword)) return true;
+    }
+    const wordsMap = { 'zero': '0', 'one': '1', 'two': '2', 'three': '3', 'four': '4', 'five': '5', 'six': '6', 'seven': '7', 'eight': '8', 'nine': '9' };
+    let textWithDigits = normalized;
+    Object.keys(wordsMap).forEach(word => { textWithDigits = textWithDigits.replaceAll(word, wordsMap[word]); });
+    let cleanText = textWithDigits.replace(/\b\d{4}[-/]\d{2}[-/]\d{2}\b/g, '');
+    cleanText = cleanText.replace(/\b\d{2}[-/]\d{2}[-/]\d{4}\b/g, '');
+    cleanText = cleanText.replace(/[#$€£]\d+/g, '');
+    const digitsOnly = cleanText.replace(/[^0-9]/g, "");
+    if (digitsOnly.length >= 7) return true;
+    return false;
+  };
 
   const lastMsgRaw = conversation?.last_message ?? conversation?.lastMessage;
   let lastMessage = typeof lastMsgRaw === "string" ? lastMsgRaw : lastMsgRaw?.message ?? lastMsgRaw?.body ?? "No messages yet";
-  if (lastMsgRaw && typeof lastMsgRaw === "object" && lastMsgRaw.message_type === "call") {
+  if (shouldRedactText(lastMessage)) {
+    lastMessage = "🚫 [Content Blocked]";
+  } else if (lastMsgRaw && typeof lastMsgRaw === "object" && lastMsgRaw.message_type === "call") {
     lastMessage = "📞 Live Meeting";
+  } else if (lastMsgRaw && typeof lastMsgRaw === "object" && lastMsgRaw.message_type === "audio") {
+    lastMessage = "🎤 Voice message";
+  } else if (lastMsgRaw && typeof lastMsgRaw === "object" && lastMsgRaw.message_type === "file") {
+    lastMessage = "📎 File";
+  } else if (lastMsgRaw && typeof lastMsgRaw === "object" && lastMsgRaw.message_type === "image") {
+    lastMessage = "📷 Photo";
   }
+
   const timeRaw = conversation?.last_message_time || (typeof lastMsgRaw === "object" && lastMsgRaw?.created_at);
   const time = timeRaw ? moment(timeRaw).format("HH:mm") : "";
   const unreadCount = conversation?.unread_count ?? conversation?.unreadCount ?? 0;
 
   return (
     <div
-      className="d-flex align-items-center p-3 mb-1"
-      style={{ 
-        backgroundColor: isSelected ? "var(--inbox-hover, rgba(255,255,255,0.05))" : theme.cardBg, 
-        cursor: "pointer", 
-        transition: "0.2s",
-        borderRadius: '12px',
-        borderLeft: `3px solid ${theme.primaryOrange}`
-      }}
       onClick={onClick}
+      className="wa-chat-item"
+      style={{
+        display: "flex",
+        alignItems: "center",
+        padding: "10px 16px",
+        cursor: "pointer",
+        backgroundColor: isSelected ? "var(--wa-panel-active)" : "transparent",
+        borderBottom: "1px solid var(--wa-divider)",
+        transition: "background-color 0.15s ease",
+        position: "relative",
+      }}
+      onMouseEnter={e => { if (!isSelected) e.currentTarget.style.backgroundColor = "var(--wa-panel-hover)"; }}
+      onMouseLeave={e => { if (!isSelected) e.currentTarget.style.backgroundColor = "transparent"; }}
     >
-      <div className="position-relative">
+      {/* Avatar */}
+      <div style={{ position: "relative", flexShrink: 0 }}>
         {conversation?.is_group ? (
-          <div
-            style={{ 
-              width: 45, height: 45, borderRadius: "50%", 
-              backgroundColor: "var(--inbox-primary)", color: "#fff", 
-              display: "flex", alignItems: "center", justifyContent: "center",
-              fontSize: "20px", fontWeight: "bold", border: `1px solid ${theme.lightBorder}` 
-            }}
-          >
+          <div style={{
+            width: 49, height: 49, borderRadius: "50%",
+            backgroundColor: "#00A884", color: "#fff",
+            display: "flex", alignItems: "center", justifyContent: "center",
+            fontSize: "22px",
+          }}>
             👥
           </div>
         ) : (
           <img
             src={otherUser?.image || userFallback}
-            width={45}
-            height={45}
+            width={49} height={49}
             alt="user"
-            style={{ borderRadius: "50%", objectFit: "cover" }}
+            style={{ borderRadius: "50%", objectFit: "cover", display: "block" }}
+            onError={e => { e.target.src = userFallback; }}
           />
         )}
         {isOnline && (
-          <span className="position-absolute rounded-circle"
-            style={{ 
-              width: "12px", height: "12px", bottom: "2px", right: "2px",
-              backgroundColor: "#22c55e", border: "2px solid #020617"
-            }}
-          ></span>
+          <span style={{
+            position: "absolute", bottom: "1px", right: "1px",
+            width: "13px", height: "13px",
+            backgroundColor: "var(--wa-online)",
+            border: "2px solid var(--wa-panel)",
+            borderRadius: "50%",
+          }} />
         )}
       </div>
 
-      <div className="ms-3 w-100 overflow-hidden">
-        <div className="d-flex justify-content-between align-items-center">
-          <p className="fw-bold mb-0 text-truncate" style={{ color: theme.pureWhite, fontSize: "14px" }}>
+      {/* Content */}
+      <div style={{ flex: 1, minWidth: 0, marginLeft: "13px" }}>
+        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline", marginBottom: "3px" }}>
+          <span style={{
+            fontSize: "16px", fontWeight: "500",
+            color: "var(--wa-text-primary)",
+            overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap",
+            flex: 1, marginRight: "8px",
+          }}>
             {displayName}
-          </p>
-          <p className="mb-0 fw-bold" style={{ fontSize: "11px", color: theme.primaryOrange }}>{time}</p>
+          </span>
+          <span style={{ fontSize: "12px", color: "var(--wa-green-time)", flexShrink: 0, fontWeight: "500" }}>{time}</span>
         </div>
-        <div className="d-flex justify-content-between align-items-center mt-1">
-          <p className="mb-0 fw-medium text-truncate" style={{ color: theme.pureWhite, fontSize: "12px", maxWidth: '80%' }}>
-            {lastMessage}
-          </p>
+        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+          <div style={{
+            fontSize: "14px", color: "var(--wa-text-primary)",
+            fontWeight: "500",
+            overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap",
+            flex: 1, marginRight: "8px",
+            display: "flex",
+            alignItems: "center"
+          }}>
+            {lastMsgRaw && lastMsgRaw.sender_id === currentUser.id && (() => {
+              const isRead = !!lastMsgRaw.read;
+              const tickColor = isRead ? "#f0591f" : "var(--wa-text-muted)";
+              const tickText = (isRead || isOnline) ? "✓✓" : "✓";
+              return (
+                <span style={{ 
+                  marginRight: "4px", 
+                  color: tickColor,
+                  fontSize: "14px",
+                  fontWeight: "800",
+                  display: "inline-flex"
+                }}>
+                  {tickText}
+                </span>
+              );
+            })()}
+            <span style={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", flex: 1 }}>
+              {lastMessage}
+            </span>
+          </div>
           {unreadCount > 0 && (
-            <span style={{ 
-              backgroundColor: theme.primaryOrange, color: 'white', 
-              fontSize: '10px', padding: '2px 7px', borderRadius: '50%', fontWeight: 'bold' 
+            <span style={{
+              backgroundColor: "var(--wa-green-badge)",
+              color: "#fff",
+              fontSize: "11px",
+              fontWeight: "600",
+              minWidth: "20px",
+              height: "20px",
+              borderRadius: "10px",
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "center",
+              padding: "0 6px",
+              flexShrink: 0,
             }}>
-              {unreadCount}
+              {unreadCount > 99 ? "99+" : unreadCount}
             </span>
           )}
         </div>

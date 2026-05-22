@@ -34,10 +34,13 @@ import {
 
 import { IoMdAttach } from "react-icons/io";
 import { RiSendPlaneFill } from "react-icons/ri";
+import { BsMicFill, BsStopFill, BsThreeDotsVertical } from "react-icons/bs";
+import { MdKeyboardVoice } from "react-icons/md";
 import { useLocation, useNavigate } from "react-router-dom";
 import Select from "react-select";
 import "react-toastify/dist/ReactToastify.css";
 import Swal from "sweetalert2";
+import moment from "moment";
 import userImg from "../../../assets/chatImg.webp";
 import DefaultImage from "../../../assets/default.webp";
 import echo from "../../../echo";
@@ -60,6 +63,7 @@ import {
   handleTypingIndicator,
   markMessagesAsRead,
   sendMessage,
+  setSelectedConversation,
   setUserOffline,
   setUserOnline,
 } from "../../../redux/slices/messageSlice";
@@ -136,6 +140,26 @@ const canCommunicateDirectly = (
       return true;
     return false;
   }
+  return true;
+};
+
+// ─── FOLLOW SYSTEM RESTRICTIONS ─────────────────────────────────────────────
+const canFollow = (followerRole, followingRole) => {
+  const isFollowerClient = followerRole?.toLowerCase().includes("client");
+  const isFollowerExpert = followerRole?.toLowerCase().includes("expert") || followerRole?.toLowerCase().includes("freelancer");
+  const isFollowerBD = followerRole?.toLowerCase().includes("bidder") || followerRole?.toLowerCase().includes("middleman") || followerRole?.toLowerCase().includes("company representative");
+  
+  const isFollowingClient = followingRole?.toLowerCase().includes("client");
+  const isFollowingExpert = followingRole?.toLowerCase().includes("expert") || followingRole?.toLowerCase().includes("freelancer");
+  const isFollowingBD = followingRole?.toLowerCase().includes("bidder") || followingRole?.toLowerCase().includes("middleman") || followingRole?.toLowerCase().includes("company representative");
+  
+  // Block: Client ↔ Expert, Client ↔ Client
+  if (isFollowerClient && isFollowingExpert) return false;
+  if (isFollowerExpert && isFollowingClient) return false;
+  if (isFollowerClient && isFollowingClient) return false;
+  
+  // Allow: All other combinations
+  // Client ↔ BD, BD ↔ Client, BD ↔ BD, BD ↔ Expert, Expert ↔ BD, Expert ↔ Expert
   return true;
 };
 
@@ -446,8 +470,9 @@ const DownloadAttachments = ({ offer, hasDeliveryAttachment }) => {
       toast.info(`Starting download: ${file.name}`, { autoClose: 2000, hideProgressBar: true });
 
       const baseUrl = axios.defaults.baseURL ? axios.defaults.baseURL.replace(/\/api\/?$/, "") : "https://portal.grapetask.co";
-      const cleanPath = file.path.startsWith("/") ? file.path.substring(1) : file.path;
-      const directDownloadUrl = `${baseUrl}/${cleanPath}`;
+      const directDownloadUrl = file.path.startsWith("http://") || file.path.startsWith("https://") 
+        ? file.path 
+        : `${baseUrl}/${file.path.startsWith("/") ? file.path.substring(1) : file.path}`;
 
       try {
         const response = await fetch(directDownloadUrl);
@@ -713,6 +738,317 @@ const WhatsAppAudioPlayer = ({ src }) => {
   );
 };
 
+// ─── BATCH MESSAGE OPTIONS DROPDOWN COMPONENT (WhatsApp Style) ─────────────────
+const BatchMessageOptions = ({ msg, isSender, activeDropdownMsgId, setActiveDropdownMsgId, onDeleteMessage, onDeleteBatch, isBatch, batchMessages, T, getFileUrl }) => {
+  const isOpen = activeDropdownMsgId === msg.id;
+  const [selectedForDelete, setSelectedForDelete] = useState([]);
+  const [showDeleteSelection, setShowDeleteSelection] = useState(false);
+
+  // If in selection mode, show which items are selected
+  const isItemSelected = (msgId) => selectedForDelete.includes(msgId);
+
+  const toggleItemSelection = (msgId) => {
+    if (isItemSelected(msgId)) {
+      setSelectedForDelete(prev => prev.filter(id => id !== msgId));
+    } else {
+      setSelectedForDelete(prev => [...prev, msgId]);
+    }
+  };
+
+  // Get selected count text
+  const getSelectedCount = () => {
+    const count = selectedForDelete.length;
+    return count > 0 ? `(${count})` : '';
+  };
+
+  return (
+    <div style={{ position: "relative", marginRight: 8 }}>
+      {/* 3-dots button */}
+      {!showDeleteSelection && (
+        <button
+          onClick={(e) => {
+            e.stopPropagation();
+            setActiveDropdownMsgId(isOpen ? null : msg.id);
+          }}
+          style={{
+            background: "transparent",
+            border: "none",
+            cursor: "pointer",
+            padding: "4px",
+            opacity: 0.6,
+            color: isSender ? "rgba(255,255,255,0.8)" : "#666",
+          }}
+        >
+          <BsThreeDotsVertical size={16} />
+        </button>
+      )}
+
+      {/* Dropdown Menu */}
+      {isOpen && !showDeleteSelection && (
+        <div
+          style={{
+            position: "absolute",
+            top: "100%",
+            right: 0,
+            backgroundColor: "#fff",
+            borderRadius: "8px",
+            boxShadow: "0 2px 8px rgba(0,0,0,0.15)",
+            minWidth: "200px",
+            zIndex: 1000,
+            padding: "8px 0",
+          }}
+        >
+          {/* Delete for Everyone */}
+          <button
+            onClick={(e) => {
+              e.stopPropagation();
+              if (isBatch && batchMessages.length > 1) {
+                // Show selection UI for batch
+                setShowDeleteSelection(true);
+                setActiveDropdownMsgId(null);
+              } else {
+                onDeleteMessage(msg.id, 'everyone');
+                setActiveDropdownMsgId(null);
+              }
+            }}
+            style={{
+              width: "100%",
+              padding: "10px 16px",
+              textAlign: "left",
+              background: "transparent",
+              border: "none",
+              cursor: "pointer",
+              fontSize: "14px",
+              color: "#333",
+              display: "flex",
+              alignItems: "center",
+              gap: "8px",
+            }}
+          >
+            <span>🗑️</span>
+            {isBatch ? `Delete for Everyone (${batchMessages.length})` : "Delete for Everyone"}
+          </button>
+
+          {/* Delete for Me */}
+          <button
+            onClick={(e) => {
+              e.stopPropagation();
+              if (isBatch && batchMessages.length > 1) {
+                setShowDeleteSelection(true);
+                setActiveDropdownMsgId(null);
+              } else {
+                onDeleteMessage(msg.id, 'me');
+                setActiveDropdownMsgId(null);
+              }
+            }}
+            style={{
+              width: "100%",
+              padding: "10px 16px",
+              textAlign: "left",
+              background: "transparent",
+              border: "none",
+              cursor: "pointer",
+              fontSize: "14px",
+              color: "#333",
+              display: "flex",
+              alignItems: "center",
+              gap: "8px",
+            }}
+          >
+            <span>🗑️</span>
+            {isBatch ? `Delete for Me (${batchMessages.length})` : "Delete for Me"}
+          </button>
+
+          {/* Cancel */}
+          <button
+            onClick={(e) => {
+              e.stopPropagation();
+              setActiveDropdownMsgId(null);
+            }}
+            style={{
+              width: "100%",
+              padding: "10px 16px",
+              textAlign: "left",
+              background: "transparent",
+              border: "none",
+              cursor: "pointer",
+              fontSize: "14px",
+              color: "#666",
+              borderTop: "1px solid #eee",
+              marginTop: "4px",
+            }}
+          >
+            Cancel
+          </button>
+        </div>
+      )}
+
+      {/* Delete Selection Mode */}
+      {showDeleteSelection && (
+        <div
+          style={{
+            position: "fixed",
+            top: 0,
+            left: 0,
+            right: 0,
+            bottom: 0,
+            backgroundColor: "rgba(0,0,0,0.8)",
+            zIndex: 9999,
+            display: "flex",
+            flexDirection: "column",
+          }}
+          onClick={() => setShowDeleteSelection(false)}
+        >
+          {/* Header */}
+          <div
+            style={{
+              backgroundColor: "#1a1a1a",
+              padding: "16px",
+              display: "flex",
+              justifyContent: "space-between",
+              alignItems: "center",
+            }}
+            onClick={(e) => e.stopPropagation()}
+          >
+            <h3 style={{ color: "#fff", margin: 0, fontSize: "18px" }}>
+              Select to Delete {getSelectedCount()}
+            </h3>
+            <button
+              onClick={() => setShowDeleteSelection(false)}
+              style={{
+                background: "transparent",
+                border: "none",
+                color: "#fff",
+                fontSize: "24px",
+                cursor: "pointer",
+              }}
+            >
+              ✕
+            </button>
+          </div>
+
+          {/* Grid of items */}
+          <div
+            style={{
+              flex: 1,
+              padding: "16px",
+              overflowY: "auto",
+              display: "grid",
+              gridTemplateColumns: "repeat(3, 1fr)",
+              gap: "8px",
+            }}
+            onClick={(e) => e.stopPropagation()}
+          >
+            {batchMessages.map((batchMsg) => (
+              <div
+                key={batchMsg.id}
+                onClick={() => toggleItemSelection(batchMsg.id)}
+                style={{
+                  aspectRatio: "1",
+                  borderRadius: "8px",
+                  overflow: "hidden",
+                  cursor: "pointer",
+                  position: "relative",
+                  border: isItemSelected(batchMsg.id) ? "3px solid #00A884" : "3px solid transparent",
+                }}
+              >
+                {batchMsg.file_name?.match(/\.(jpg|jpeg|png|gif|webp)$/i) ? (
+                  <img
+                    src={getFileUrl(batchMsg.file_path)}
+                    alt={batchMsg.file_name}
+                    style={{ width: "100%", height: "100%", objectFit: "cover" }}
+                  />
+                ) : batchMsg.file_name?.match(/\.(mp4|webm|mov|ogg|quicktime|m4v|3gp)$/i) ? (
+                  <div style={{ width: "100%", height: "100%", backgroundColor: "#1a1a1a", position: "relative" }}>
+                    <video src={getFileUrl(batchMsg.file_path)} style={{ width: "100%", height: "100%", objectFit: "cover" }} />
+                    <div style={{ position: "absolute", bottom: "4px", right: "4px", backgroundColor: "rgba(0,0,0,0.7)", color: "#fff", padding: "2px 6px", borderRadius: "4px", fontSize: "10px" }}>▶</div>
+                  </div>
+                ) : (
+                  <div style={{ width: "100%", height: "100%", backgroundColor: "#333", display: "flex", alignItems: "center", justifyContent: "center", fontSize: "32px" }}>📄</div>
+                )}
+                
+                {/* Checkmark for selected */}
+                {isItemSelected(batchMsg.id) && (
+                  <div style={{
+                    position: "absolute",
+                    top: "8px",
+                    right: "8px",
+                    width: "24px",
+                    height: "24px",
+                    borderRadius: "50%",
+                    backgroundColor: "#00A884",
+                    display: "flex",
+                    alignItems: "center",
+                    justifyContent: "center",
+                    color: "#fff",
+                    fontSize: "14px",
+                  }}>✓</div>
+                )}
+              </div>
+            ))}
+          </div>
+
+          {/* Footer with delete buttons */}
+          <div
+            style={{
+              backgroundColor: "#1a1a1a",
+              padding: "16px",
+              display: "flex",
+              gap: "12px",
+            }}
+            onClick={(e) => e.stopPropagation()}
+          >
+            <button
+              onClick={() => {
+                if (selectedForDelete.length > 0) {
+                  onDeleteBatch(selectedForDelete, 'me');
+                }
+                setShowDeleteSelection(false);
+                setSelectedForDelete([]);
+              }}
+              disabled={selectedForDelete.length === 0}
+              style={{
+                flex: 1,
+                padding: "12px",
+                backgroundColor: selectedForDelete.length > 0 ? "#333" : "#222",
+                color: selectedForDelete.length > 0 ? "#fff" : "#666",
+                border: "none",
+                borderRadius: "8px",
+                cursor: selectedForDelete.length > 0 ? "pointer" : "not-allowed",
+                fontSize: "14px",
+              }}
+            >
+              Delete for Me {getSelectedCount()}
+            </button>
+            <button
+              onClick={() => {
+                if (selectedForDelete.length > 0) {
+                  onDeleteBatch(selectedForDelete, 'everyone');
+                }
+                setShowDeleteSelection(false);
+                setSelectedForDelete([]);
+              }}
+              disabled={selectedForDelete.length === 0}
+              style={{
+                flex: 1,
+                padding: "12px",
+                backgroundColor: selectedForDelete.length > 0 ? "#FF6B6B" : "#442222",
+                color: selectedForDelete.length > 0 ? "#fff" : "#666",
+                border: "none",
+                borderRadius: "8px",
+                cursor: selectedForDelete.length > 0 ? "pointer" : "not-allowed",
+                fontSize: "14px",
+              }}
+            >
+              Delete for Everyone {getSelectedCount()}
+            </button>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+};
+
 // ─── MESSAGE OPTIONS DROPDOWN COMPONENT ───────────────────────────────────────
 const MessageOptions = ({ msg, isSender, activeDropdownMsgId, setActiveDropdownMsgId, onDeleteMessage, T }) => {
   const isOpen = activeDropdownMsgId === msg.id;
@@ -847,6 +1183,37 @@ const Chatting = () => {
     else setTimeout(readUserData, 0);
   }, []);
 
+  const [chatWallpaper, setChatWallpaper] = useState(() => localStorage.getItem("chatWallpaper") || "default");
+  const [chatFontSize, setChatFontSize] = useState(() => localStorage.getItem("chatFontSize") || "medium");
+
+  useEffect(() => {
+    const handleUserDataChanged = (e) => {
+      setCurrentUser(e.detail);
+    };
+    const handleWallpaperChange = (e) => {
+      setChatWallpaper(e.detail);
+    };
+    const handleFontSizeChange = (e) => {
+      setChatFontSize(e.detail);
+    };
+
+    window.addEventListener("userDataChanged", handleUserDataChanged);
+    window.addEventListener("chatWallpaperChanged", handleWallpaperChange);
+    window.addEventListener("chatFontSizeChanged", handleFontSizeChange);
+
+    return () => {
+      window.removeEventListener("userDataChanged", handleUserDataChanged);
+      window.removeEventListener("chatWallpaperChanged", handleWallpaperChange);
+      window.removeEventListener("chatFontSizeChanged", handleFontSizeChange);
+    };
+  }, []);
+
+  const getBubbleFontSize = () => {
+    if (chatFontSize === "small") return "12px";
+    if (chatFontSize === "large") return "17.5px";
+    return "14.2px"; // default medium
+  };
+
   const UserRole = currentUser?.role;
   const userId = currentUser?.id;
 
@@ -864,29 +1231,186 @@ const Chatting = () => {
   const [inputVal, setInputVal] = useState("");
   const [selectedFile, setSelectedFile] = useState(null);
   const [filePreview, setFilePreview] = useState(null);
+  const [imageCaption, setImageCaption] = useState("");
+  const [showImageUploadModal, setShowImageUploadModal] = useState(false);
+  const [selectedImages, setSelectedImages] = useState([]); // Multiple images support
+  const [currentBatchId, setCurrentBatchId] = useState(null); // For grouping multiple media
   const [selectedMemberProfile, setSelectedMemberProfile] = useState(null);
   const [showMembersListModal, setShowMembersListModal] = useState(false);
   const [activeDropdownMsgId, setActiveDropdownMsgId] = useState(null);
   const [showHeaderMenu, setShowHeaderMenu] = useState(false);
+  // ── Attachment popup + Camera states ──
+  const [showAttachMenu, setShowAttachMenu] = useState(false);
+  const [showCameraModal, setShowCameraModal] = useState(false);
+  const [cameraFacing, setCameraFacing] = useState('user'); // 'user' = front, 'environment' = back
+  const [cameraMode, setCameraMode] = useState('photo'); // 'photo' | 'video'
+  const [isRecordingVideo, setIsRecordingVideo] = useState(false);
+  const [recordedVideo, setRecordedVideo] = useState(null);
+  const [videoRecordingTime, setVideoRecordingTime] = useState(0);
+  const videoMediaRecorderRef = useRef(null);
+  const videoRecordingIntervalRef = useRef(null);
+  const videoChunksRef = useRef([]);
+  
+  // ── Voice Recording States ──
+  const [isRecording, setIsRecording] = useState(false);
+  const [recordingTime, setRecordingTime] = useState(0);
+  const [mediaRecorder, setMediaRecorder] = useState(null);
+  const recordingIntervalRef = useRef(null);
+  const isCancelledRef = useRef(false);
+  const [isCancelled, setIsCancelled] = useState(false);
+  const touchStartXRef = useRef(0);
+  const isDraggingRef = useRef(false);
+  const [cameraStream, setCameraStream] = useState(null);
+  const [capturedPhoto, setCapturedPhoto] = useState(null);
+  const videoRef = useRef(null);
+  const canvasRef = useRef(null);
+  const galleryInputRef = useRef(null);
+  const documentInputRef = useRef(null);
   const [activeCallRoom, setActiveCallRoom] = useState(null);
   const [showIframe, setShowIframe] = useState(false);
   const [securityWarningText, setSecurityWarningText] = useState("");
   const [lightboxMedia, setLightboxMedia] = useState(null);
+  const activeThumbnailRef = useRef(null);
   const [mediaPreviewFiles, setMediaPreviewFiles] = useState([]);
+  const [showGalleryModal, setShowGalleryModal] = useState(false);
+  const [galleryMedia, setGalleryMedia] = useState([]);
   const [activeMediaIndex, setActiveMediaIndex] = useState(0);
   const [mediaCaption, setMediaCaption] = useState("");
 
-  useEffect(() => {
-    const handleGlobalEscape = (e) => {
-      if (e.key === "Escape") {
-        setLightboxMedia(null);
-      }
-    };
-    if (lightboxMedia) {
-      document.addEventListener("keydown", handleGlobalEscape);
-      return () => document.removeEventListener("keydown", handleGlobalEscape);
+  // ── WhatsApp Style Emoji/GIF/Stickers Panel ──
+  const [showEmojiPanel, setShowEmojiPanel] = useState(false);
+  const [activePanelTab, setActivePanelTab] = useState('emoji'); // 'emoji' | 'gif' | 'stickers'
+  const [gifs, setGifs] = useState([]);
+  const [gifSearch, setGifSearch] = useState('');
+  const [stickers, setStickers] = useState([
+    '😀', '😃', '😄', '😁', '😆', '😅', '😂', '🤣', '😊', '😇',
+    '🙂', '🙃', '😉', '😌', '😍', '🥰', '😘', '😗', '😙', '😚',
+    '😋', '😛', '😝', '😜', '🤪', '🤨', '🧐', '🤓', '😎', '🥸',
+    '🤩', '🥳', '😏', '😒', '😞', '😔', '😟', '😕', '🙁', '☹️',
+    '👍', '👎', '👏', '🙌', '🤝', '🤞', '✌️', '🤟', '🤘', '👌',
+  ]);
+  const [isLoadingGifs, setIsLoadingGifs] = useState(false);
+  const emojiPanelRef = useRef(null);
+  const tabsPanelRef = useRef(null);
+
+  // Sample GIFs for demo (working URLs)
+  const sampleGifs = useMemo(() => [
+    { id: '1', url: 'https://media2.giphy.com/media/v1.Y2lkPTc5MGI3NjExbGtxaXl0dWswbXNubDc5aWtxOHB4dGZ5d2RneXhlNHZkdGZydnJ4dCZlcD12MV9pbnRlcm5hbF9naWZfYnlfaWQmY3Q9Zw/3o7TKSjRrfIPjeiVyE/giphy.gif', title: 'Hello' },
+    { id: '2', url: 'https://media1.giphy.com/media/v1.Y2lkPTc5MGI3NjExcnlocWJtZWZyYzlhZGR4aWltcTJkZ2U1eW15cXU3ZDRtZzhiZ3B0ayZlcD12MV9pbnRlcm5hbF9naWZfYnlfaWQmY3Q9Zw/l0HlNQ03J5JxX6lva/giphy.gif', title: 'Thumbs Up' },
+    { id: '3', url: 'https://media3.giphy.com/media/v1.Y2lkPTc5MGI3NjExaGZ5dWw1a2l6d2x1bHVsdWh2eWk2dHZtbnJ6d3h3eGZ5Y2d5aGJ0dyZlcD12MV9pbnRlcm5hbF9naWZfYnlfaWQmY3Q9Zw/3o7TKDMPKsTyss9zHy/giphy.gif', title: 'Happy' },
+    { id: '4', url: 'https://media2.giphy.com/media/v1.Y2lkPTc5MGI3NjExbWx0aHh3bWloaGV0bGZ0eGJkdmF4aWx5eW14dHV1eWZ5ZGV5aGJ0dyZlcD12MV9pbnRlcm5hbF9naWZfYnlfaWQmY3Q9Zw/l0HlNDKGNf2v2UKUU/giphy.gif', title: 'Love' },
+    { id: '5', url: 'https://media.giphy.com/media/tIeCLkJ8o0Zuo/giphy.gif', title: 'Laugh' },
+    { id: '6', url: 'https://media.giphy.com/media/26gsjCZpPolPr3SFq/giphy.gif', title: 'Cool' },
+  ], []);
+
+  // Fetch GIFs from Giphy API
+  const fetchGifs = useCallback(async (query = 'trending') => {
+    setIsLoadingGifs(true);
+    try {
+      // Use sample GIFs for now (API key issues)
+      setTimeout(() => {
+        setGifs(sampleGifs.map(gif => ({
+          id: gif.id,
+          title: gif.title,
+          images: {
+            fixed_height_small: { url: gif.url },
+            fixed_height_small_still: { url: gif.url }
+          }
+        })));
+        setIsLoadingGifs(false);
+      }, 500);
+    } catch (error) {
+      console.error('Error fetching GIFs:', error);
+      setGifs([]);
+      setIsLoadingGifs(false);
     }
-  }, [lightboxMedia]);
+  }, [sampleGifs]);
+
+  // Load trending GIFs when GIF tab opens
+  useEffect(() => {
+    if (showEmojiPanel && activePanelTab === 'gif') {
+      if (gifs.length === 0) {
+        fetchGifs('trending');
+      }
+    }
+  }, [showEmojiPanel, activePanelTab, fetchGifs, gifs.length]);
+
+  // Show tabs panel when input is focused
+  const [showTabsPanel, setShowTabsPanel] = useState(false);
+
+  // Close panel on outside click
+  useEffect(() => {
+    const handleClickOutside = (e) => {
+      const inputContainer = document.querySelector('.chat-input-container');
+
+      // Check if click is inside any of our panels
+      const isInsideEmojiPanel = emojiPanelRef.current && emojiPanelRef.current.contains(e.target);
+      const isInsideTabsPanel = tabsPanelRef.current && tabsPanelRef.current.contains(e.target);
+      const isInsideInput = inputContainer && inputContainer.contains(e.target);
+
+      // Don't close if clicking inside any panel or input
+      if (isInsideEmojiPanel || isInsideTabsPanel || isInsideInput) {
+        return;
+      }
+
+      // Close everything if clicking outside
+      setShowTabsPanel(false);
+      setShowEmojiPanel(false);
+    };
+
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, [showEmojiPanel, showTabsPanel]);
+
+  // Send GIF as message (using text type with GIF URL)
+  const sendGif = useCallback(async (gifUrl) => {
+    if (!receiverId || !isCommunicationAllowed) {
+      toast.error("Cannot send message to this user");
+      return;
+    }
+    if (!gifUrl) {
+      toast.error("Invalid GIF");
+      return;
+    }
+    try {
+      // Send as text message with GIF URL
+      const messageData = {
+        receiver_id: receiverId,
+        message: gifUrl,
+      };
+      await dispatch(sendMessage(messageData)).unwrap();
+      toast.success("GIF sent!");
+      setShowEmojiPanel(false);
+    } catch (err) {
+      toast.error(err || "Failed to send GIF");
+    }
+  }, [receiverId, isCommunicationAllowed, dispatch]);
+
+  // Add emoji to input (instead of sending directly)
+  const addEmojiToInput = useCallback((emoji) => {
+    setInputVal(prev => prev + emoji);
+    // Keep panel open so user can add more emojis
+    // User will type message and press send manually
+  }, []);
+
+  // Send sticker as message (large emoji)
+  const sendSticker = useCallback(async (emoji) => {
+    if (!receiverId || !isCommunicationAllowed) {
+      toast.error("Cannot send message to this user");
+      return;
+    }
+    try {
+      // Send sticker as a separate large message
+      const messageData = {
+        receiver_id: receiverId,
+        message: emoji,
+      };
+      await dispatch(sendMessage(messageData)).unwrap();
+      toast.success("Sticker sent!");
+    } catch (err) {
+      toast.error(err || "Failed to send sticker");
+    }
+  }, [receiverId, isCommunicationAllowed, dispatch]);
 
   useEffect(() => {
     let recognition = null;
@@ -999,12 +1523,188 @@ const Chatting = () => {
     }
   };
 
+  // ── Camera Functions ────────────────────────────────────────────────────────
+  const openCamera = async () => {
+    setCapturedPhoto(null);
+    setRecordedVideo(null);
+    setShowCameraModal(true);
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({
+        video: { facingMode: cameraFacing, width: { ideal: 1280 }, height: { ideal: 720 } },
+        audio: cameraMode === 'video' // Enable audio for video mode
+      });
+      setCameraStream(stream);
+      if (videoRef.current) {
+        videoRef.current.srcObject = stream;
+        videoRef.current.play().catch(() => {});
+      }
+    } catch (err) {
+      toast.error("Could not access camera. Please allow camera permission.");
+      setShowCameraModal(false);
+    }
+  };
+
+  const closeCamera = () => {
+    if (cameraStream) {
+      cameraStream.getTracks().forEach(t => t.stop());
+      setCameraStream(null);
+    }
+    setCapturedPhoto(null);
+    setShowCameraModal(false);
+  };
+
+  const flipCamera = async () => {
+    const newFacing = cameraFacing === 'user' ? 'environment' : 'user';
+    setCameraFacing(newFacing);
+    if (cameraStream) {
+      cameraStream.getTracks().forEach(t => t.stop());
+    }
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({
+        video: { facingMode: newFacing, width: { ideal: 1280 }, height: { ideal: 720 } },
+        audio: false
+      });
+      setCameraStream(stream);
+      if (videoRef.current) {
+        videoRef.current.srcObject = stream;
+        videoRef.current.play().catch(() => {});
+      }
+    } catch (err) {
+      toast.error("Could not flip camera.");
+    }
+  };
+
+  const capturePhoto = () => {
+    if (!videoRef.current || !canvasRef.current) return;
+    const video = videoRef.current;
+    const canvas = canvasRef.current;
+    canvas.width = video.videoWidth || 1280;
+    canvas.height = video.videoHeight || 720;
+    const ctx = canvas.getContext('2d');
+    if (cameraFacing === 'user') {
+      ctx.translate(canvas.width, 0);
+      ctx.scale(-1, 1);
+    }
+    ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
+    const dataUrl = canvas.toDataURL('image/jpeg', 0.92);
+    setCapturedPhoto(dataUrl);
+  };
+
+  const sendCapturedPhoto = () => {
+    if (!capturedPhoto) return;
+    const blob = dataURLtoBlob(capturedPhoto);
+    const file = new File([blob], `camera_${Date.now()}.jpg`, { type: 'image/jpeg' });
+    setSelectedFile(file);
+    setFilePreview(capturedPhoto);
+    closeCamera();
+  };
+
+  // ── Video Recording Functions ───────────────────────────────────────────────
+  const startVideoRecording = () => {
+    if (!cameraStream) return;
+    
+    videoChunksRef.current = [];
+    
+    // Try different mime types for better compatibility
+    let mimeType = 'video/webm';
+    if (MediaRecorder.isTypeSupported('video/webm;codecs=vp9')) {
+      mimeType = 'video/webm;codecs=vp9';
+    } else if (MediaRecorder.isTypeSupported('video/webm;codecs=vp8')) {
+      mimeType = 'video/webm;codecs=vp8';
+    } else if (MediaRecorder.isTypeSupported('video/webm;codecs=h264')) {
+      mimeType = 'video/webm;codecs=h264';
+    }
+    
+    const mediaRecorder = new MediaRecorder(cameraStream, {
+      mimeType: mimeType,
+      videoBitsPerSecond: 2500000 // 2.5 Mbps for good quality
+    });
+    
+    videoMediaRecorderRef.current = mediaRecorder;
+    
+    mediaRecorder.ondataavailable = (event) => {
+      if (event.data.size > 0) {
+        videoChunksRef.current.push(event.data);
+      }
+    };
+    
+    mediaRecorder.onstop = () => {
+      const videoBlob = new Blob(videoChunksRef.current, { type: 'video/webm' });
+      const videoUrl = URL.createObjectURL(videoBlob);
+      setRecordedVideo({ url: videoUrl, blob: videoBlob });
+    };
+    
+    mediaRecorder.start(100);
+    setIsRecordingVideo(true);
+    setVideoRecordingTime(0);
+    
+    // Timer
+    videoRecordingIntervalRef.current = setInterval(() => {
+      setVideoRecordingTime(prev => prev + 1);
+    }, 1000);
+  };
+  
+  const stopVideoRecording = () => {
+    if (videoMediaRecorderRef.current && videoMediaRecorderRef.current.state !== 'inactive') {
+      videoMediaRecorderRef.current.stop();
+    }
+    setIsRecordingVideo(false);
+    setVideoRecordingTime(0);
+    if (videoRecordingIntervalRef.current) {
+      clearInterval(videoRecordingIntervalRef.current);
+      videoRecordingIntervalRef.current = null;
+    }
+  };
+  
+  const cancelVideoRecording = () => {
+    if (videoMediaRecorderRef.current && videoMediaRecorderRef.current.state !== 'inactive') {
+      videoMediaRecorderRef.current.stop();
+    }
+    setIsRecordingVideo(false);
+    setRecordedVideo(null);
+    if (videoRecordingIntervalRef.current) {
+      clearInterval(videoRecordingIntervalRef.current);
+      videoRecordingIntervalRef.current = null;
+    }
+    videoChunksRef.current = [];
+  };
+  
+  const sendRecordedVideo = () => {
+    if (!recordedVideo) return;
+    const file = new File([recordedVideo.blob], `video_${Date.now()}.webm`, { type: 'video/webm' });
+    setSelectedFile(file);
+    setFilePreview(recordedVideo.url);
+    closeCamera();
+  };
+  
+  const formatVideoTime = (seconds) => {
+    const mins = Math.floor(seconds / 60);
+    const secs = seconds % 60;
+    return `${mins}:${secs.toString().padStart(2, '0')}`;
+  };
+
+  const dataURLtoBlob = (dataURL) => {
+    const arr = dataURL.split(',');
+    const mime = arr[0].match(/:(.*?);/)[1];
+    const bstr = atob(arr[1]);
+    let n = bstr.length;
+    const u8arr = new Uint8Array(n);
+    while (n--) u8arr[n] = bstr.charCodeAt(n);
+    return new Blob([u8arr], { type: mime });
+  };
+
+
   useEffect(() => {
-    const closeDropdown = () => {
+    const closeDropdown = (e) => {
+      // If user clicked the attach button or inside attach menu, don't auto-close
+      if (e.target.closest('.wa-attach-btn') || e.target.closest('.wa-attach-container')) {
+        return;
+      }
       setActiveDropdownMsgId(null);
       setShowHeaderMenu(false);
+      setShowAttachMenu(false);
     };
-    window.addEventListener("click", closeDropdown);
+    window.addEventListener("click", closeDropdown, true);
     return () => window.removeEventListener("click", closeDropdown);
   }, []);
 
@@ -1041,12 +1741,28 @@ const Chatting = () => {
 
   const handleDeleteMessage = async (messageId, deleteType) => {
     try {
-      await axios.delete('/messages', {
-        data: { message_id: messageId, delete_type: deleteType }
+      await axios.post('/messages/delete', {
+        message_id: messageId,
+        delete_type: deleteType
       });
       dispatch(deleteMessageLocally({ messageId, deleteType }));
     } catch (err) {
       toast.error(err.response?.data?.message || "Failed to delete message.");
+    }
+  };
+
+  const handleDeleteBatch = async (messageIds, deleteType) => {
+    try {
+      for (const messageId of messageIds) {
+        await axios.post('/messages/delete', {
+          message_id: messageId,
+          delete_type: deleteType
+        });
+        dispatch(deleteMessageLocally({ messageId, deleteType }));
+      }
+      toast.success(`${messageIds.length} item(s) deleted successfully!`);
+    } catch (err) {
+      toast.error(err.response?.data?.message || "Failed to delete messages.");
     }
   };
 
@@ -1156,102 +1872,13 @@ const Chatting = () => {
     }
   };
 
-  // Voice Note states
-  const [isRecording, setIsRecording] = useState(false);
-  const [recordingDuration, setRecordingDuration] = useState(0);
-  const mediaRecorderRef = useRef(null);
-  const audioChunksRef = useRef([]);
-  const recordingTimerRef = useRef(null);
-
-  const startRecording = async () => {
-    try {
-      const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
-      audioChunksRef.current = [];
-      const options = { mimeType: "audio/webm" };
-      let recorder;
-      try {
-        recorder = new MediaRecorder(stream, options);
-      } catch (err) {
-        recorder = new MediaRecorder(stream);
-      }
-      mediaRecorderRef.current = recorder;
-      
-      recorder.ondataavailable = (event) => {
-        if (event.data && event.data.size > 0) {
-          audioChunksRef.current.push(event.data);
-        }
-      };
-
-      recorder.onstop = () => {
-        const audioBlob = new Blob(audioChunksRef.current, { type: "audio/webm" });
-        const voiceFile = new File([audioBlob], `voice_note_${Date.now()}.webm`, { type: "audio/webm" });
-        setSelectedFile(voiceFile);
-        
-        // Setup file preview URL so it can be played back
-        const audioUrl = URL.createObjectURL(audioBlob);
-        setFilePreview(audioUrl);
-        
-        // Stop all tracks on the stream to release mic icon
-        stream.getTracks().forEach(track => track.stop());
-      };
-
-      recorder.start(200); // chunk size 200ms
-      setIsRecording(true);
-      setRecordingDuration(0);
-      
-      recordingTimerRef.current = setInterval(() => {
-        setRecordingDuration(prev => prev + 1);
-      }, 1000);
-      
-    } catch (error) {
-      console.error("Error accessing microphone:", error);
-      toast.error("Could not access microphone. Please check permissions.");
-    }
-  };
-
-  const stopRecording = () => {
-    if (mediaRecorderRef.current && isRecording) {
-      mediaRecorderRef.current.stop();
-      setIsRecording(false);
-      if (recordingTimerRef.current) {
-        clearInterval(recordingTimerRef.current);
-        recordingTimerRef.current = null;
-      }
-    }
-  };
-
-  const cancelRecording = () => {
-    if (mediaRecorderRef.current && isRecording) {
-      mediaRecorderRef.current.onstop = null; // discard recording callback
-      mediaRecorderRef.current.stop();
-      // stop stream tracks
-      try {
-        mediaRecorderRef.current.stream.getTracks().forEach(track => track.stop());
-      } catch (err) {}
-      setIsRecording(false);
-      if (recordingTimerRef.current) {
-        clearInterval(recordingTimerRef.current);
-        recordingTimerRef.current = null;
-      }
-      setSelectedFile(null);
-      setFilePreview(null);
-    }
-  };
-
-  useEffect(() => {
-    return () => {
-      if (recordingTimerRef.current) {
-        clearInterval(recordingTimerRef.current);
-      }
-    };
-  }, []);
-  const getFileUrl = (filePath) => {
+  const getFileUrl = useCallback((filePath) => {
     if (!filePath) return "";
     const baseUrl = window.location.origin.replace(":3000", ":8000");
     const cleanPath = filePath.replace("public/", "");
     const token = localStorage.getItem("accessToken");
     return `${baseUrl}/api/messages/file/${cleanPath}?token=${token}`;
-  };
+  }, []);
 
   const formatRoleForDisplay = (role) => {
     if (!role) return "";
@@ -1269,6 +1896,50 @@ const Chatting = () => {
       return "Admin";
     }
     return role;
+  };
+
+  // WhatsApp-style Chat Wallpaper Functions
+  const getChatBackground = () => {
+    const customUrl = localStorage.getItem("customWallpaperUrl");
+    
+    if (chatWallpaper === "custom" && customUrl) {
+      return "transparent";
+    }
+    
+    const colors = {
+      default: "#e5ddd5",
+      dark: "#0f1419",
+      blue: "#e3f2fd",
+      green: "#e8f5e9",
+      purple: "#f3e5f5",
+      pink: "#fce4ec",
+      orange: "#fff3e0",
+      gray: "#f5f5f5"
+    };
+    
+    return colors[chatWallpaper] || colors.default;
+  };
+
+  const getChatBackgroundImage = () => {
+    const customUrl = localStorage.getItem("customWallpaperUrl");
+    
+    if (chatWallpaper === "custom" && customUrl) {
+      return `url(${customUrl})`;
+    }
+    
+    // WhatsApp-style subtle patterns
+    const patterns = {
+      default: `url("data:image/svg+xml,%3Csvg width='60' height='60' viewBox='0 0 60 60' xmlns='http://www.w3.org/2000/svg'%3E%3Cg fill='none' fill-rule='evenodd'%3E%3Cg fill='%239C92AC' fill-opacity='0.08'%3E%3Cpath d='M36 34v-4h-2v4h-4v2h4v4h2v-4h4v-2h-4zm0-30V0h-2v4h-4v2h4v4h2V6h4V4h-4zM6 34v-4H4v4H0v2h4v4h2v-4h4v-2H6zM6 4V0H4v4H0v2h4v4h2V6h4V4H6z'/%3E%3C/g%3E%3C/g%3E%3C/svg%3E")`,
+      dark: `url("data:image/svg+xml,%3Csvg width='60' height='60' viewBox='0 0 60 60' xmlns='http://www.w3.org/2000/svg'%3E%3Cg fill='none' fill-rule='evenodd'%3E%3Cg fill='%23ffffff' fill-opacity='0.03'%3E%3Cpath d='M36 34v-4h-2v4h-4v2h4v4h2v-4h4v-2h-4zm0-30V0h-2v4h-4v2h4v4h2V6h4V4h-4zM6 34v-4H4v4H0v2h4v4h2v-4h4v-2H6zM6 4V0H4v4H0v2h4v4h2V6h4V4H6z'/%3E%3C/g%3E%3C/g%3E%3C/svg%3E")`,
+      blue: `url("data:image/svg+xml,%3Csvg width='52' height='26' viewBox='0 0 52 26' xmlns='http://www.w3.org/2000/svg'%3E%3Cg fill='none' fill-rule='evenodd'%3E%3Cg fill='%234a90e2' fill-opacity='0.05'%3E%3Cpath d='M10 10c0-2.21-1.79-4-4-4-3.314 0-6-2.686-6-6h2c0 2.21 1.79 4 4 4 3.314 0 6 2.686 6 6 0 2.21 1.79 4 4 4 3.314 0 6 2.686 6 6 0 2.21-1.79 4-4 4-3.314 0-6-2.686-6-6 0-2.21-1.79-4-4-4-3.314 0-6-2.686-6-6h2c0 2.21 1.79 4 4 4 3.314 0 6 2.686 6 6 0 2.21 1.79 4 4 4 3.314 0 6 2.686 6 6 0 2.21-1.79 4-4 4-3.314 0-6-2.686-6-6 0-2.21-1.79-4-4-4-3.314 0-6-2.686-6-6h2c0 2.21 1.79 4 4 4 3.314 0 6 2.686 6 6z'/%3E%3C/g%3E%3C/g%3E%3C/svg%3E")`,
+      green: `url("data:image/svg+xml,%3Csvg width='20' height='20' viewBox='0 0 20 20' xmlns='http://www.w3.org/2000/svg'%3E%3Cg fill='none' fill-rule='evenodd'%3E%3Cg fill='%234caf50' fill-opacity='0.05'%3E%3Ccircle cx='3' cy='3' r='3'/%3E%3Ccircle cx='13' cy='13' r='3'/%3E%3C/g%3E%3C/g%3E%3C/svg%3E")`,
+      purple: `url("data:image/svg+xml,%3Csvg width='44' height='44' viewBox='0 0 44 44' xmlns='http://www.w3.org/2000/svg'%3E%3Cg fill='none' fill-rule='evenodd'%3E%3Cg fill='%239c27b0' fill-opacity='0.05'%3E%3Cpath d='M11 11h2v2h-2v-2zm8 0h2v2h-2v-2zm-8 8h2v2h-2v-2zm8 0h2v2h-2v-2z'/%3E%3C/g%3E%3C/g%3E%3C/svg%3E")`,
+      pink: `url("data:image/svg+xml,%3Csvg width='40' height='40' viewBox='0 0 40 40' xmlns='http://www.w3.org/2000/svg'%3E%3Cg fill='none' fill-rule='evenodd'%3E%3Cg fill='%23e91e63' fill-opacity='0.05'%3E%3Cpath d='M20 20c0-5.523 4.477-10 10-10s10 4.477 10 10-4.477 10-10 10-10-4.477-10-10zM0 20c0-5.523 4.477-10 10-10s10 4.477 10 10-4.477 10-10 10S0 25.523 0 20zm20 0c0-5.523-4.477-10-10-10S0 14.477 0 20s4.477 10 10 10 10-4.477 10-10z'/%3E%3C/g%3E%3C/g%3E%3C/svg%3E")`,
+      orange: `url("data:image/svg+xml,%3Csvg width='28' height='28' viewBox='0 0 28 28' xmlns='http://www.w3.org/2000/svg'%3E%3Cg fill='none' fill-rule='evenodd'%3E%3Cg fill='%23ff9800' fill-opacity='0.05'%3E%3Cpath d='M2 2h4v4H2V2zm4 4h4v4H6V6zm4-4h4v4h-4V2zm8 4h4v4h-4V6z'/%3E%3C/g%3E%3C/g%3E%3C/svg%3E")`,
+      gray: `url("data:image/svg+xml,%3Csvg width='20' height='20' viewBox='0 0 20 20' xmlns='http://www.w3.org/2000/svg'%3E%3Cg fill='none' fill-rule='evenodd'%3E%3Cg fill='%23607d8b' fill-opacity='0.05'%3E%3Cpath d='M1 1h2v2H1V1zm4 4h2v2H5V5zm4-4h2v2H9V1zm4 4h2v2h-2V5zm4-4h2v2h-2V1zm4 4h2v2h-2V5z'/%3E%3C/g%3E%3C/g%3E%3C/svg%3E")`
+    };
+    
+    return patterns[chatWallpaper] || patterns.default;
   };
 
   const [downloadingFileId, setDownloadingFileId] = useState(null);
@@ -1339,9 +2010,21 @@ const Chatting = () => {
     [experts]);
 
   const isReceiverOnline = useMemo(() => {
-    if (!receiverId || !onlineUsers) return false;
-    return onlineUsers[receiverId] === "online";
-  }, [receiverId, onlineUsers]);
+    if (!receiverId) return false;
+    const statusInRedux = onlineUsers ? onlineUsers[receiverId] : undefined;
+    if (statusInRedux === "online" || statusInRedux === true) return true;
+    if (statusInRedux === "offline") return false;
+
+    // Fallback: check if receiver's last_seen from DB is within 5 minutes
+    if (receiver?.last_seen) {
+      const lastSeenMoment = receiver.last_seen.includes('Z') || receiver.last_seen.includes('+')
+        ? moment(receiver.last_seen)
+        : moment.utc(receiver.last_seen);
+      const diffMinutes = Math.abs(moment().diff(lastSeenMoment, 'minutes'));
+      return diffMinutes < 5;
+    }
+    return false;
+  }, [receiverId, onlineUsers, receiver?.last_seen]);
 
   const isReceiverTyping = useMemo(() => {
     if (!receiverId || !selectedConversation?.id || !typingUsers) return false;
@@ -1667,6 +2350,148 @@ const Chatting = () => {
     }
   }, [inputVal, selectedFile, receiverId, isUserTyping, handleTypingChange, dispatch, isCommunicationAllowed]);
 
+  // ── Send Voice Message Directly (WhatsApp Style) ──
+  const sendVoiceMessage = async (file) => {
+    if (!receiverId || !isCommunicationAllowed) {
+      toast.error("Cannot send message to this user");
+      return;
+    }
+    
+    try {
+      const formData = new FormData();
+      formData.append('file', file);
+      formData.append('receiver_id', receiverId);
+      formData.append('conversation_id', selectedConversation?.id || '');
+      formData.append('message_type', 'voice');
+      
+      await dispatch(sendMessage(formData)).unwrap();
+    } catch (err) {
+      toast.error(err || "Failed to send voice message");
+    }
+  };
+
+  // ── Voice Recording Functions ──
+  const startVoiceRecording = async () => {
+    // Prevent multiple recordings
+    if (isRecording || recordingIntervalRef.current) return;
+    
+    // Reset cancelled flag
+    isCancelledRef.current = false;
+    setIsCancelled(false);
+    
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+      const recorder = new MediaRecorder(stream);
+      const chunks = [];
+
+      recorder.ondataavailable = (e) => chunks.push(e.data);
+      recorder.onstop = () => {
+        // Stop all tracks to release microphone
+        stream.getTracks().forEach(track => track.stop());
+        
+        // Only send if not cancelled
+        if (!isCancelledRef.current && chunks.length > 0) {
+          const blob = new Blob(chunks, { type: 'audio/webm' });
+          const file = new File([blob], `voice_note_${Date.now()}.webm`, { type: 'audio/webm' });
+          
+          // Auto-send immediately (WhatsApp style)
+          sendVoiceMessage(file);
+        }
+      };
+
+      setMediaRecorder(recorder);
+      recorder.start();
+      setIsRecording(true);
+      setRecordingTime(0);
+
+      // Start timer using ref to prevent duplicates
+      if (recordingIntervalRef.current) {
+        clearInterval(recordingIntervalRef.current);
+      }
+      recordingIntervalRef.current = setInterval(() => {
+        setRecordingTime(prev => prev + 1);
+      }, 1000);
+
+    } catch (error) {
+      console.error('Error accessing microphone:', error);
+      toast.error('Could not access microphone');
+    }
+  };
+
+  const stopVoiceRecording = () => {
+    // Prevent multiple stops
+    if (!isRecording && !recordingIntervalRef.current) return;
+    
+    if (mediaRecorder && mediaRecorder.state === 'recording') {
+      mediaRecorder.stop();
+    }
+    setIsRecording(false);
+    if (recordingIntervalRef.current) {
+      clearInterval(recordingIntervalRef.current);
+      recordingIntervalRef.current = null;
+    }
+  };
+
+  const cancelVoiceRecording = () => {
+    // Only cancel if actually recording
+    if (!isRecording && !recordingIntervalRef.current) return;
+    
+    // Mark as cancelled so it won't auto-send
+    setIsCancelled(true);
+    isCancelledRef.current = true;
+    
+    if (mediaRecorder && mediaRecorder.state === 'recording') {
+      mediaRecorder.stop();
+    }
+    setIsRecording(false);
+    setRecordingTime(0);
+    if (recordingIntervalRef.current) {
+      clearInterval(recordingIntervalRef.current);
+      recordingIntervalRef.current = null;
+    }
+  };
+
+  // ── Slide to Cancel Handlers ──
+  const handleTouchStart = (e) => {
+    touchStartXRef.current = e.touches[0].clientX;
+    isDraggingRef.current = true;
+  };
+
+  const handleTouchMove = (e) => {
+    if (!isDraggingRef.current || !isRecording) return;
+    
+    const touchX = e.touches[0].clientX;
+    const diff = touchStartXRef.current - touchX;
+    
+    // If dragged left more than 100px, cancel
+    if (diff > 100) {
+      cancelVoiceRecording();
+      isDraggingRef.current = false;
+    }
+  };
+
+  const handleMouseDown = (e) => {
+    touchStartXRef.current = e.clientX;
+    isDraggingRef.current = true;
+  };
+
+  const handleMouseMove = (e) => {
+    if (!isDraggingRef.current || !isRecording) return;
+    
+    const mouseX = e.clientX;
+    const diff = touchStartXRef.current - mouseX;
+    
+    // If dragged left more than 100px, cancel
+    if (diff > 100) {
+      cancelVoiceRecording();
+      isDraggingRef.current = false;
+    }
+  };
+
+  const handleDragEnd = () => {
+    isDraggingRef.current = false;
+  };
+
   const handleKeyPress = useCallback((e) => {
     if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); handleSend(); }
   }, [handleSend]);
@@ -1675,51 +2500,102 @@ const Chatting = () => {
     const files = Array.from(e.target.files || []);
     if (files.length === 0) return;
 
-    const mediaFiles = files.filter(f => f.type.startsWith("image/") || f.type.startsWith("video/"));
+    const imageFiles = files.filter(f => f.type.startsWith("image/"));
+    const videoFiles = files.filter(f => f.type.startsWith("video/"));
     const otherFiles = files.filter(f => !f.type.startsWith("image/") && !f.type.startsWith("video/"));
 
-    if (mediaFiles.length > 0) {
-      const newItems = mediaFiles.map(file => {
-        const isImage = file.type.startsWith("image/");
-        return {
-          file,
-          url: URL.createObjectURL(file),
-          type: isImage ? "image" : "video",
-          caption: ""
-        };
-      });
+    // Handle all files (images, videos, documents) together in modal
+    const mediaItems = [];
 
-      setMediaPreviewFiles(prev => {
-        const updated = [...prev, ...newItems];
-        if (prev.length === 0) {
-          setActiveMediaIndex(0);
-          setMediaCaption("");
-        }
-        return updated;
+    if (imageFiles.length > 0) {
+      imageFiles.forEach(file => {
+        mediaItems.push({
+          file,
+          preview: URL.createObjectURL(file),
+          selected: true,
+          type: "image"
+        });
       });
     }
 
+    if (videoFiles.length > 0) {
+      videoFiles.forEach(file => {
+        mediaItems.push({
+          file,
+          preview: URL.createObjectURL(file),
+          selected: true,
+          type: "video"
+        });
+      });
+    }
+
+    // Documents (PDF, Word, Excel, etc.)
     if (otherFiles.length > 0) {
-      const file = otherFiles[0];
-      setSelectedFile(file);
-      const isPreviewable = file.type === "application/pdf";
-      if (isPreviewable) {
-        const reader = new FileReader();
-        reader.onloadend = () => setFilePreview(reader.result || "");
-        reader.readAsDataURL(file);
-      } else {
-        setFilePreview(null);
-      }
+      otherFiles.forEach(file => {
+        const ext = file.name.split('.').pop().toLowerCase();
+        let docType = "file";
+        if (ext === 'pdf') docType = "pdf";
+        else if (['doc', 'docx'].includes(ext)) docType = "word";
+        else if (['xls', 'xlsx'].includes(ext)) docType = "excel";
+        else if (['ppt', 'pptx'].includes(ext)) docType = "ppt";
+        else if (['zip', 'rar'].includes(ext)) docType = "zip";
+        
+        mediaItems.push({
+          file,
+          preview: null, // Documents don't have previews
+          selected: true,
+          type: docType,
+          fileName: file.name,
+          fileSize: file.size
+        });
+      });
+    }
+
+    if (mediaItems.length > 0) {
+      setSelectedImages(mediaItems);
+      setShowImageUploadModal(true);
     }
     e.target.value = "";
   };
+
+  // Cancel image upload modal
+  const cancelImageUpload = useCallback(() => {
+    setSelectedFile(null);
+    setFilePreview(null);
+    setImageCaption("");
+    setSelectedImages([]);
+    setShowImageUploadModal(false);
+  }, []);
+
+  // Send image with caption
+  const sendImageWithCaption = useCallback(async () => {
+    if (!selectedFile || !receiverId) return;
+    if (!isCommunicationAllowed) { toast.error("Communication with this user is restricted."); return; }
+
+    try {
+      const messageData = {
+        receiver_id: receiverId,
+        message_type: "file",
+        message: imageCaption?.trim() || "",
+        file: selectedFile,
+      };
+      await dispatch(sendMessage(messageData)).unwrap();
+      setSelectedFile(null);
+      setFilePreview(null);
+      setImageCaption("");
+      setShowImageUploadModal(false);
+      toast.success("Image sent!");
+    } catch (err) {
+      toast.error(err || "Failed to send image");
+    }
+  }, [selectedFile, receiverId, imageCaption, isCommunicationAllowed, dispatch]);
 
   const handleSendMedia = async () => {
     if (mediaPreviewFiles.length === 0 || !receiverId) return;
     if (!isCommunicationAllowed) { toast.error("Communication with this user is restricted."); return; }
 
     const itemsToSend = [...mediaPreviewFiles];
-    
+
     // Clear state immediately to make UI responsive
     setMediaPreviewFiles([]);
     setActiveMediaIndex(0);
@@ -2149,6 +3025,59 @@ const Chatting = () => {
     });
   }, [messages, isCommunicationAllowed, userId]);
 
+  const conversationMedia = useMemo(() => {
+    if (!filteredMessages) return [];
+    return filteredMessages
+      .filter((m) => m.file_path && m.file_name?.match(/\.(jpg|jpeg|png|gif|webp|mp4|webm|mov|ogg|quicktime|m4v|3gp)$/i))
+      .map((m) => {
+        const isImg = m.file_name?.match(/\.(jpg|jpeg|png|gif|webp)$/i);
+        return {
+          id: m.id,
+          url: getFileUrl(m.file_path),
+          type: isImg ? "image" : "video",
+          fileName: m.file_name,
+          filePath: m.file_path,
+          msgId: m.id
+        };
+      });
+  }, [filteredMessages, getFileUrl]);
+
+  const activeLightboxIndex = useMemo(() => {
+    if (!lightboxMedia) return -1;
+    if (lightboxMedia.type === "pdf") return -1;
+    return conversationMedia.findIndex(item => item.msgId === lightboxMedia.msgId || item.url === lightboxMedia.url);
+  }, [lightboxMedia, conversationMedia]);
+
+  useEffect(() => {
+    if (activeThumbnailRef.current) {
+      activeThumbnailRef.current.scrollIntoView({
+        behavior: "smooth",
+        block: "nearest",
+        inline: "center"
+      });
+    }
+  }, [activeLightboxIndex]);
+
+  useEffect(() => {
+    const handleGlobalKeyDown = (e) => {
+      if (e.key === "Escape") {
+        setLightboxMedia(null);
+      } else if (e.key === "ArrowRight") {
+        if (activeLightboxIndex >= 0 && activeLightboxIndex < conversationMedia.length - 1) {
+          setLightboxMedia(conversationMedia[activeLightboxIndex + 1]);
+        }
+      } else if (e.key === "ArrowLeft") {
+        if (activeLightboxIndex > 0) {
+          setLightboxMedia(conversationMedia[activeLightboxIndex - 1]);
+        }
+      }
+    };
+    if (lightboxMedia) {
+      document.addEventListener("keydown", handleGlobalKeyDown);
+      return () => document.removeEventListener("keydown", handleGlobalKeyDown);
+    }
+  }, [lightboxMedia, conversationMedia, activeLightboxIndex]);
+
   // ─── OFFER MESSAGE RENDER ──────────────────────────────────────────────────
   const renderOfferMessage = (msg) => {
     const offer = msg?.offer || offers?.find((o) => o.id === msg.offer_id);
@@ -2385,19 +3314,27 @@ const Chatting = () => {
         ::-webkit-scrollbar-track { background: transparent; }
         ::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.08); border-radius: 4px; }
         ::-webkit-scrollbar-thumb:hover { background: rgba(240,89,31,0.4); }
+        @keyframes wa-popup-in {
+          0%   { opacity: 0; transform: translateX(-50%) scale(0.85); }
+          100% { opacity: 1; transform: translateX(-50%) scale(1); }
+        }
+        @keyframes wa-camera-in {
+          0%   { opacity: 0; transform: scale(0.96); }
+          100% { opacity: 1; transform: scale(1); }
+        }
       `}</style>
 
       {/* ── CHAT CONTAINER ── */}
-      <div style={{ height: "100vh", maxHeight: "100vh", display: "flex", flexDirection: "column", position: "relative", overflow: "hidden", width: "100%", backgroundColor: T.mainBg }}>
+      <div style={{ height: "100vh", maxHeight: "100vh", display: "flex", flexDirection: "column", position: "relative", overflow: "hidden", width: "100%", backgroundColor: "var(--wa-bg, #111B21)" }}>
 
         {/* ── HEADER ── */}
         <div style={{
-          flexShrink: 0, padding: "12px 20px",
-          backgroundColor: T.headerBg,
-          borderBottom: `1px solid ${T.border}`,
+          flexShrink: 0, padding: "10px 16px",
+          backgroundColor: "var(--wa-header-bg, #202C33)",
+          borderBottom: "1px solid var(--wa-divider, #374045)",
           display: "flex", alignItems: "center", justifyContent: "space-between",
           zIndex: 10,
-          backdropFilter: "blur(12px)",
+          minHeight: "60px",
           cursor: "pointer"
         }} onClick={(e) => {
           if (!selectedConversation?.is_group) {
@@ -2442,18 +3379,18 @@ const Chatting = () => {
                   src={receiver?.image || userImg}
                   alt="user"
                   onError={(e) => (e.target.src = userImg)}
-                  style={{ width: "44px", height: "44px", borderRadius: "50%", objectFit: "cover", border: `2px solid ${isReceiverOnline ? "#22c55e" : T.border}` }}
+                  style={{ width: "44px", height: "44px", borderRadius: "50%", objectFit: "cover" }}
                 />
                 <div style={{
                   position: "absolute", bottom: 1, right: 1,
-                  width: 11, height: 11, borderRadius: "50%",
-                  backgroundColor: isReceiverOnline ? "#22c55e" : T.darkGray,
-                  border: `2px solid ${T.mainBg}`,
+                  width: 12, height: 12, borderRadius: "50%",
+                  backgroundColor: isReceiverOnline ? "var(--wa-online, #00A884)" : "transparent",
+                  border: isReceiverOnline ? "2px solid var(--wa-header-bg, #202C33)" : "none",
                 }} />
               </div>
             )}
             <div>
-              <p style={{ margin: 0, fontWeight: 600, fontSize: "15px", color: T.white }}>
+              <p style={{ margin: 0, fontWeight: "500", fontSize: "16px", color: "var(--wa-text-primary, #E9EDEF)", lineHeight: 1.2 }}>
                 {selectedConversation?.is_group ? selectedConversation.title : (receiver?.fname || receiver?.name || "User")}
               </p>
               {selectedConversation?.is_group ? (
@@ -2488,8 +3425,16 @@ const Chatting = () => {
                   );
                 })()
               ) : (
-                <small style={{ color: isSomeoneTyping ? T.orange : isReceiverOnline ? "#22c55e" : T.bodyGray, fontSize: "12px", fontWeight: 500 }}>
-                  {isSomeoneTyping ? "typing..." : isReceiverOnline ? "● Online" : "Offline"}
+                <small style={{ color: isSomeoneTyping ? "var(--wa-green)" : isReceiverOnline ? "var(--wa-online, #00A884)" : "var(--wa-text-muted, #667781)", fontSize: "13px", fontWeight: 400 }}>
+                  {isSomeoneTyping ? "typing..." : isReceiverOnline ? "online" : (() => {
+                    if (receiver?.last_seen) {
+                      const lastSeenMoment = receiver.last_seen.includes('Z') || receiver.last_seen.includes('+')
+                        ? moment(receiver.last_seen)
+                        : moment.utc(receiver.last_seen).local();
+                      return "last seen " + lastSeenMoment.fromNow();
+                    }
+                    return "offline";
+                  })()}
                 </small>
               )}
               {!isCommunicationAllowed && (
@@ -2580,6 +3525,35 @@ const Chatting = () => {
                   minWidth: "150px",
                   overflow: "hidden"
                 }} onClick={(e) => e.stopPropagation()}>
+                  {/* Close Chat Button */}
+                  <button
+                    className="d-none d-md-flex"
+                    onClick={() => {
+                      setShowHeaderMenu(false);
+                      dispatch(setSelectedConversation(null));
+                    }}
+                    style={{
+                      width: "100%",
+                      padding: "12px 16px",
+                      backgroundColor: "transparent",
+                      color: T.white,
+                      border: "none",
+                      borderBottom: `1px solid ${T.border}`,
+                      textAlign: "left",
+                      cursor: "pointer",
+                      fontSize: "14px",
+                      fontWeight: 600,
+                      alignItems: "center",
+                      gap: "8px",
+                      transition: "background 0.2s"
+                    }}
+                    onMouseEnter={(e) => e.currentTarget.style.backgroundColor = T.border}
+                    onMouseLeave={(e) => e.currentTarget.style.backgroundColor = "transparent"}
+                  >
+                    ✕ Close Chat
+                  </button>
+
+                  {/* Clear Chat Button */}
                   <button
                     onClick={() => {
                       setShowHeaderMenu(false);
@@ -2614,13 +3588,18 @@ const Chatting = () => {
         {/* ── MESSAGES AREA ── */}
         <div
           ref={scrollRef}
+          className="chat-messages-area"
           style={{
             flex: "1 1 auto", overflowY: "auto",
             maxHeight: "calc(100vh - 150px)",
             display: "flex", flexDirection: "column",
-            padding: "16px 20px",
-            backgroundColor: T.mainBg,
-            backgroundImage: "radial-gradient(ellipse at 20% 80%, rgba(240,89,31,0.03) 0%, transparent 50%), radial-gradient(ellipse at 80% 20%, rgba(59,130,246,0.03) 0%, transparent 50%)",
+            padding: "8px 5%",
+            backgroundColor: getChatBackground(),
+            backgroundImage: getChatBackgroundImage(),
+            backgroundSize: "cover",
+            backgroundPosition: "center",
+            backgroundRepeat: "no-repeat",
+            backgroundAttachment: "fixed",
           }}
         >
           {loading ? (
@@ -2639,6 +3618,33 @@ const Chatting = () => {
                 msg.file_name?.match(/\.(jpg|jpeg|png|gif|webp|mp3|wav|ogg|webm|m4a|3gp|aac)$/i) || 
                 msg.file_name?.includes("voice_note")
               );
+              // Check if part of batch (from backend or time-based)
+              const BATCH_TIME_WINDOW = 30000; // 30 seconds
+              const isPartOfBatch = (() => {
+                // First check if backend has batch_id
+                if (msg.batch_id && msg.file_path) return true;
+                // Otherwise use time-based grouping
+                if (!msg.file_path || msg.message) return false;
+                // Check if there are other media messages within time window from same sender
+                const currentTime = new Date(msg.created_at).getTime();
+                const prevMsg = filteredMessages[i-1];
+                const nextMsg = filteredMessages[i+1];
+                const isSameSender = (m) => String(m.sender_id) === String(msg.sender_id);
+                const isMediaOnly = (m) => m.file_path && !m.message;
+                const isWithinTimeWindow = (m) => {
+                  if (!m) return false;
+                  const otherTime = new Date(m.created_at).getTime();
+                  return Math.abs(currentTime - otherTime) < BATCH_TIME_WINDOW;
+                };
+                // Check if prev or next message is also media from same sender within time window
+                const hasAdjacentMedia = (
+                  (prevMsg && isSameSender(prevMsg) && isMediaOnly(prevMsg) && isWithinTimeWindow(prevMsg)) ||
+                  (nextMsg && isSameSender(nextMsg) && isMediaOnly(nextMsg) && isWithinTimeWindow(nextMsg))
+                );
+                return hasAdjacentMedia;
+              })();
+              const isBatchStart = isPartOfBatch && (!filteredMessages[i-1] || !(filteredMessages[i-1].file_path && !filteredMessages[i-1].message) || String(filteredMessages[i-1].sender_id) !== String(msg.sender_id) || (new Date(msg.created_at).getTime() - new Date(filteredMessages[i-1].created_at).getTime()) > BATCH_TIME_WINDOW);
+              const isBatchEnd = isPartOfBatch && (!filteredMessages[i+1] || !(filteredMessages[i+1].file_path && !filteredMessages[i+1].message) || String(filteredMessages[i+1].sender_id) !== String(msg.sender_id) || (new Date(filteredMessages[i+1].created_at).getTime() - new Date(msg.created_at).getTime()) > BATCH_TIME_WINDOW);
 
               return (
                 <div key={msg.id || i} style={{ display: "flex", marginBottom: "10px", justifyContent: isSender ? "flex-end" : "flex-start" }}>
@@ -2649,25 +3655,55 @@ const Chatting = () => {
                     />
                   )}
 
-                  {isSender && (
-                    <MessageOptions 
-                      msg={msg} 
-                      isSender={isSender} 
-                      activeDropdownMsgId={activeDropdownMsgId} 
-                      setActiveDropdownMsgId={setActiveDropdownMsgId} 
-                      onDeleteMessage={handleDeleteMessage} 
-                      T={T} 
+                  {/* Show 3-dots menu only for last message in batch or non-batched messages */}
+                  {isSender && (!isPartOfBatch || isBatchEnd) && (
+                    <BatchMessageOptions 
+                      msg={msg}
+                      isSender={isSender}
+                      activeDropdownMsgId={activeDropdownMsgId}
+                      setActiveDropdownMsgId={setActiveDropdownMsgId}
+                      onDeleteMessage={handleDeleteMessage}
+                      onDeleteBatch={handleDeleteBatch}
+                      isBatch={isPartOfBatch}
+                      batchMessages={isPartOfBatch ? (() => {
+                        const batch = [];
+                        let idx = i;
+                        const currentSenderId = String(msg.sender_id);
+                        const BATCH_TIME_WINDOW = 30000;
+                        while (idx < filteredMessages.length) {
+                          const currentMsg = filteredMessages[idx];
+                          if (msg.batch_id && currentMsg.batch_id === msg.batch_id) {
+                            if (currentMsg.file_path) batch.push(currentMsg);
+                            idx++;
+                            continue;
+                          }
+                          if (!msg.batch_id && currentMsg.file_path && !currentMsg.message) {
+                            const isSameSender = String(currentMsg.sender_id) === currentSenderId;
+                            const timeDiff = Math.abs(new Date(currentMsg.created_at).getTime() - new Date(msg.created_at).getTime());
+                            if (isSameSender && timeDiff < BATCH_TIME_WINDOW) {
+                              batch.push(currentMsg);
+                              idx++;
+                              continue;
+                            }
+                          }
+                          break;
+                        }
+                        return batch;
+                      })() : [msg]}
+                      T={T}
+                      getFileUrl={getFileUrl}
                     />
                   )}
 
                   <div style={{
-                    padding: msg.message_type === "offer" ? "0" : isVisualAttachment ? "0" : "10px 14px",
-                    borderRadius: isSender ? "18px 18px 4px 18px" : "18px 18px 18px 4px",
+                    padding: msg.message_type === "offer" ? "0" : isVisualAttachment ? "0" : "7px 12px",
+                    borderRadius: isSender ? "7.5px 7.5px 0 7.5px" : "7.5px 7.5px 7.5px 0",
                     maxWidth: msg.message_type === "offer" ? "90%" : "72%",
-                    backgroundColor: msg.message_type === "offer" ? "transparent" : isVisualAttachment ? "transparent" : isSender ? T.senderBubble : T.receiverBubble,
-                    boxShadow: msg.message_type === "offer" ? "none" : isVisualAttachment ? "none" : isSender ? "0 2px 8px rgba(240,89,31,0.25)" : "0 2px 8px rgba(0,0,0,0.2)",
+                    backgroundColor: msg.message_type === "offer" ? "transparent" : isVisualAttachment ? "transparent" : isSender ? "var(--wa-sent-bubble, #005C4B)" : "var(--wa-recv-bubble, #202C33)",
+                    boxShadow: msg.message_type === "offer" ? "none" : isVisualAttachment ? "none" : "0 1px 2px rgba(0,0,0,0.2)",
                     wordBreak: "break-word",
                     width: msg.message_type === "offer" ? "min(90%, 480px)" : "auto",
+                    position: "relative",
                   }}>
                     {!isSender && selectedConversation?.is_group && msgSender && (
                       <div 
@@ -2687,7 +3723,144 @@ const Chatting = () => {
                       </div>
                     )}
 
-                    {msg.file_path && (
+                    {/* Batch Grid for Multiple Media */}
+                    {isBatchStart && (
+                      <div style={{
+                        display: "grid",
+                        gridTemplateColumns: "1fr 1fr", // Exactly 2 columns
+                        gridTemplateRows: "1fr 1fr", // Exactly 2 rows
+                        gap: "4px",
+                        marginBottom: "4px",
+                        borderRadius: "10px",
+                        overflow: "hidden",
+                        maxWidth: "300px", // Fixed width for 2x2
+                        aspectRatio: "1", // Square container
+                      }}>
+                        {/* Find all messages in this batch (by batch_id or time window) */}
+                        {(() => {
+                          const batchMessages = [];
+                          let idx = i;
+                          const currentSenderId = String(msg.sender_id);
+                          while (idx < filteredMessages.length) {
+                            const currentMsg = filteredMessages[idx];
+                            // Check if same batch_id
+                            if (msg.batch_id && currentMsg.batch_id === msg.batch_id) {
+                              if (currentMsg.file_path) {
+                                batchMessages.push(currentMsg);
+                              }
+                              idx++;
+                              continue;
+                            }
+                            // Or check time-based grouping
+                            if (!msg.batch_id && currentMsg.file_path && !currentMsg.message) {
+                              const isSameSender = String(currentMsg.sender_id) === currentSenderId;
+                              const timeDiff = Math.abs(new Date(currentMsg.created_at).getTime() - new Date(msg.created_at).getTime());
+                              if (isSameSender && timeDiff < BATCH_TIME_WINDOW) {
+                                batchMessages.push(currentMsg);
+                                idx++;
+                                continue;
+                              }
+                            }
+                            break;
+                          }
+                          const totalCount = batchMessages.length;
+                          const showCount = Math.min(totalCount, 4);
+                          const remainingCount = totalCount - 4;
+
+                          return batchMessages.slice(0, showCount).map((batchMsg, batchIdx) => (
+                            <div
+                              key={batchMsg.id}
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                const isVideo = batchMsg.file_name?.match(/\.(mp4|webm|mov|ogg|quicktime|m4v|3gp)$/i);
+                                setLightboxMedia({
+                                  url: getFileUrl(batchMsg.file_path),
+                                  type: isVideo ? "video" : "image",
+                                  fileName: batchMsg.file_name,
+                                  filePath: batchMsg.file_path,
+                                  msgId: batchMsg.id
+                                });
+                              }}
+                              style={{
+                                aspectRatio: "1",
+                                cursor: "zoom-in",
+                                position: "relative",
+                                overflow: "hidden",
+                              }}
+                            >
+                              {batchMsg.file_name?.match(/\.(jpg|jpeg|png|gif|webp)$/i) ? (
+                                <img
+                                  src={getFileUrl(batchMsg.file_path)}
+                                  alt={batchMsg.file_name}
+                                  style={{
+                                    width: "100%",
+                                    height: "100%",
+                                    objectFit: "cover",
+                                  }}
+                                />
+                              ) : batchMsg.file_name?.match(/\.(mp4|webm|mov|ogg|quicktime|m4v|3gp)$/i) ? (
+                                <div style={{
+                                  width: "100%",
+                                  height: "100%",
+                                  backgroundColor: "#1a1a1a",
+                                  position: "relative",
+                                }}>
+                                  <video
+                                    src={getFileUrl(batchMsg.file_path)}
+                                    style={{
+                                      width: "100%",
+                                      height: "100%",
+                                      objectFit: "cover",
+                                    }}
+                                  />
+                                  <div style={{
+                                    position: "absolute",
+                                    bottom: "4px",
+                                    right: "4px",
+                                    backgroundColor: "rgba(0,0,0,0.7)",
+                                    color: "#fff",
+                                    padding: "2px 6px",
+                                    borderRadius: "4px",
+                                    fontSize: "10px",
+                                  }}>▶</div>
+                                </div>
+                              ) : (
+                                <div style={{
+                                  width: "100%",
+                                  height: "100%",
+                                  backgroundColor: "#f0f0f0",
+                                  display: "flex",
+                                  alignItems: "center",
+                                  justifyContent: "center",
+                                  fontSize: "24px",
+                                }}>📄</div>
+                              )}
+                              {/* Show +X count on 4th item if more exist */}
+                              {batchIdx === 3 && remainingCount > 0 && (
+                                <div style={{
+                                  position: "absolute",
+                                  top: 0,
+                                  left: 0,
+                                  right: 0,
+                                  bottom: 0,
+                                  backgroundColor: "rgba(0,0,0,0.6)",
+                                  display: "flex",
+                                  alignItems: "center",
+                                  justifyContent: "center",
+                                  color: "#fff",
+                                  fontSize: "28px",
+                                  fontWeight: 700,
+                                }}>
+                                  +{remainingCount}
+                                </div>
+                              )}
+                            </div>
+                          ));
+                        })()}
+                      </div>
+                    )}
+
+                    {msg.file_path && !isPartOfBatch && (
                       <div style={{ marginTop: "6px", marginBottom: "6px" }}>
                         {msg.file_name?.match(/\.(jpg|jpeg|png|gif|webp)$/i) ? (
                           <div style={{ marginBottom: "4px" }}>
@@ -2839,7 +4012,7 @@ const Chatting = () => {
                     )}
 
                     {msg.message && msg.message_type !== "offer" && msg.message_type !== "call" && (
-                      <div style={{ marginBottom: "2px", fontSize: "14px", lineHeight: 1.5, color: isSender ? "#ffffff" : T.lightGray }}>
+                      <div style={{ marginBottom: "2px", fontSize: getBubbleFontSize(), lineHeight: 1.5, color: "var(--wa-bubble-text, #E9EDEF)" }}>
                         {renderMessageText(msg.message)}
                       </div>
                     )}
@@ -2911,9 +4084,10 @@ const Chatting = () => {
                       </div>
                     )}
 
-                    {msg.message_type !== "offer" && (
-                      <div style={{ textAlign: "right", marginTop: "4px", display: "flex", alignItems: "center", justifyContent: "flex-end", gap: 4 }}>
-                        <span style={{ fontSize: "11px", color: isSender ? (isVisualAttachment ? "var(--inbox-text-light, #a1a1aa)" : "rgba(255,255,255,0.55)") : T.bodyGray }}>{time}</span>
+                    {/* Show time and ticks only for last message in batch or non-batched messages */}
+                    {msg.message_type !== "offer" && (!isPartOfBatch || isBatchEnd) && (
+                      <div style={{ textAlign: "right", marginTop: "2px", display: "flex", alignItems: "center", justifyContent: "flex-end", gap: 3 }}>
+                        <span style={{ fontSize: "11px", color: "var(--wa-time-text, #8696A0)", letterSpacing: "0.01em" }}>{time}</span>
                         {isSender && (() => {
                           const totalExpected = selectedConversation?.is_group 
                             ? (selectedConversation.participants?.length || 1) - 1 
@@ -2925,14 +4099,18 @@ const Chatting = () => {
                             ? "Seen by:\n" + msg.read_by.map(r => `${r.name} (${formatRoleForDisplay(r.role)})`).join("\n")
                             : msg.read ? "Read" : "Sent (Unread)";
 
+                          const isAnyReceiverOnline = selectedConversation?.is_group 
+                            ? selectedConversation.participants?.some(p => p.id !== currentUser.id && (onlineUsers[p.id] === 'online' || onlineUsers[p.id] === true))
+                            : isReceiverOnline;
+
                           return (
                             <div title={tooltip} style={{ display: "flex", alignItems: "center", cursor: "help" }}>
                               {readByAll ? (
-                                <BsCheck2All size={14} color="#38bdf8" />
-                              ) : actualRead > 0 ? (
-                                <BsCheck2All size={14} color={isVisualAttachment ? "var(--inbox-text-light, #a1a1aa)" : "rgba(255,255,255,0.5)"} />
+                                <BsCheck2All size={15} color="#f0591f" />
+                              ) : (actualRead > 0 || isAnyReceiverOnline) ? (
+                                <BsCheck2All size={15} color="rgba(255,255,255,0.55)" />
                               ) : (
-                                <BsCheck2 size={14} color={isVisualAttachment ? "var(--inbox-text-light, #a1a1aa)" : "rgba(255,255,255,0.5)"} />
+                                <BsCheck2 size={15} color="rgba(255,255,255,0.55)" />
                               )}
                             </div>
                           );
@@ -2991,9 +4169,9 @@ const Chatting = () => {
 
         {/* ── INPUT AREA ── */}
         <div style={{
-          flexShrink: 0, padding: "12px 85px 12px 20px",
-          backgroundColor: T.headerBg,
-          borderTop: `1px solid ${T.border}`,
+          flexShrink: 0, padding: "8px 16px",
+          backgroundColor: "var(--wa-panel, #202C33)",
+          borderTop: "1px solid var(--wa-divider, #374045)",
         }}>
           {(selectedConversation?.order_status === "completed" || selectedConversation?.order?.status === "completed") ? (
             <div style={{ backgroundColor: "rgba(168,85,247,0.06)", border: "1px solid rgba(168,85,247,0.25)", borderRadius: "10px", padding: "12px 16px", textAlign: "center" }}>
@@ -3100,108 +4278,1361 @@ const Chatting = () => {
               )}
 
               {isRecording ? (
-                <div style={{ display: "flex", alignItems: "center", backgroundColor: T.cardBgActive, borderRadius: "28px", border: `1px solid ${T.orange}`, overflow: "hidden", width: "100%", padding: "6px 14px", gap: "12px" }}>
-                  <div style={{ display: "flex", alignItems: "center", gap: "8px", flex: 1 }}>
-                    <span className="recording-blink-dot" style={{ width: "10px", height: "10px", backgroundColor: "#ef4444", borderRadius: "50%", display: "inline-block" }}></span>
-                    <span style={{ color: T.white, fontSize: "14px", fontWeight: "600", fontFamily: "monospace" }}>
-                      Recording Voice Note: {Math.floor(recordingDuration / 60)}:{(recordingDuration % 60).toString().padStart(2, "0")}
+                <div 
+                  onTouchStart={handleTouchStart}
+                  onTouchMove={handleTouchMove}
+                  onTouchEnd={handleDragEnd}
+                  onMouseDown={handleMouseDown}
+                  onMouseMove={handleMouseMove}
+                  onMouseUp={handleDragEnd}
+                  onMouseLeave={handleDragEnd}
+                  style={{ 
+                    display: "flex", 
+                    alignItems: "center", 
+                    backgroundColor: "var(--wa-input-bg, #2A3942)", 
+                    borderRadius: "28px", 
+                    overflow: "hidden", 
+                    width: "100%", 
+                    padding: "8px 12px",
+                    gap: "8px",
+                    minHeight: "52px",
+                    userSelect: "none",
+                    touchAction: "none"
+                  }}
+                >
+                  {/* Recording Red Dot */}
+                  <div style={{ 
+                    display: "flex", 
+                    alignItems: "center", 
+                    gap: "8px",
+                    flexShrink: 0
+                  }}>
+                    <span style={{ 
+                      width: "10px", 
+                      height: "10px", 
+                      backgroundColor: "#ff3131", 
+                      borderRadius: "50%",
+                      animation: "blink 1s infinite",
+                      boxShadow: "0 0 8px #ff3131"
+                    }}></span>
+                  </div>
+
+                  {/* Recording Timer */}
+                  <span style={{ 
+                    color: "#ff3131", 
+                    fontSize: "15px", 
+                    fontWeight: "600", 
+                    fontFamily: "monospace",
+                    minWidth: "45px"
+                  }}>
+                    {Math.floor(recordingTime / 60)}:{(recordingTime % 60).toString().padStart(2, "0")}
+                  </span>
+
+                  {/* Slide to Cancel with Chevron - Responsive */}
+                  <div style={{ 
+                    flex: 1, 
+                    display: "flex", 
+                    alignItems: "center", 
+                    justifyContent: "center",
+                    gap: "8px",
+                    overflow: "hidden"
+                  }}>
+                    <span style={{ 
+                      color: "var(--wa-text-second, #8696A0)", 
+                      fontSize: "clamp(12px, 3vw, 14px)",
+                      display: "flex",
+                      alignItems: "center",
+                      gap: "6px",
+                      whiteSpace: "nowrap"
+                    }}>
+                      <span style={{ 
+                        display: "inline-flex", 
+                        animation: "slideLeft 1.5s infinite ease-in-out"
+                      }}>
+                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                          <path d="M15 18l-6-6 6-6"/>
+                        </svg>
+                      </span>
+                      <span className="slide-text">Slide to cancel</span>
                     </span>
                   </div>
-                  
-                  {/* Cancel Recording button */}
-                  <button 
-                    onClick={cancelRecording}
-                    style={{
-                      background: "none", border: "none", color: "#ef4444",
-                      cursor: "pointer", fontSize: "13px", fontWeight: "600",
-                      display: "flex", alignItems: "center", gap: "4px",
-                      padding: "8px 12px", borderRadius: "14px",
-                      backgroundColor: "rgba(239, 68, 68, 0.1)"
-                    }}
-                  >
-                    🗑️ Cancel
-                  </button>
 
-                  {/* Stop and Preview button */}
+                  {/* Lock Icon (WhatsApp Style) */}
                   <button 
-                    onClick={stopRecording}
+                    onClick={stopVoiceRecording}
                     style={{
-                      border: "none", color: "#ffffff",
-                      cursor: "pointer", fontSize: "13px", fontWeight: "600",
-                      display: "flex", alignItems: "center", gap: "4px",
-                      padding: "8px 16px", borderRadius: "14px",
-                      backgroundColor: T.orange
+                      background: "none", 
+                      border: "none", 
+                      color: "var(--wa-text-second, #8696A0)",
+                      cursor: "pointer",
+                      padding: "8px",
+                      display: "flex",
+                      alignItems: "center",
+                      justifyContent: "center",
+                      transition: "all 0.2s"
                     }}
+                    title="Lock recording"
                   >
-                    ⏹️ Stop & Preview
+                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                      <rect x="5" y="11" width="14" height="10" rx="2" ry="2"/>
+                      <circle cx="12" cy="7" r="4"/>
+                    </svg>
                   </button>
                 </div>
               ) : (
-                <div style={{ display: "flex", alignItems: "center", backgroundColor: T.cardBgActive, borderRadius: "28px", border: `1px solid ${T.borderMid}`, overflow: "hidden", transition: "border-color 0.2s", gap: 0, width: "100%" }}>
-                  <input
-                    ref={inputRef}
-                    value={inputVal}
-                    onChange={handleInputChange}
-                    onKeyDown={handleKeyPress}
-                    onPaste={handlePaste}
-                    disabled={!receiverId || loading || !isCommunicationAllowed}
-                    placeholder="Type a message..."
-                    style={{
-                      flex: 1, border: "none", padding: "12px 18px",
-                      fontSize: "14px", outline: "none",
-                      backgroundColor: "transparent", color: T.white,
-                    }}
-                  />
-                  
-                  {/* Microphone / Record button */}
-                  <button
-                    onClick={startRecording}
-                    disabled={!receiverId || loading || !isCommunicationAllowed}
-                    style={{
-                      background: "transparent", border: "none", color: T.bodyGray,
-                      padding: "0 12px", cursor: "pointer", transition: "color 0.2s",
-                      display: "flex", alignItems: "center", justifyContent: "center",
-                      fontSize: "18px"
-                    }}
-                    type="button"
-                    title="Record voice note"
-                    onMouseEnter={e => e.currentTarget.style.color = T.orange}
-                    onMouseLeave={e => e.currentTarget.style.color = T.bodyGray}
-                  >
-                    🎙️
-                  </button>
+                <div style={{ 
+                  display: "flex", 
+                  flexDirection: "column",
+                  width: "100%", 
+                  gap: "8px",
+                }}>
+                  {/* ── Input Row with Voice Button ── */}
+                  <div className="chat-input-container" style={{
+                    display: "flex",
+                    alignItems: "center",
+                    gap: "8px",
+                  }}>
+                    <div style={{ 
+                      display: "flex", 
+                      alignItems: "center", 
+                      backgroundColor: "var(--wa-input-bg, #2A3942)", 
+                      borderRadius: "28px", 
+                      border: "none", 
+                      overflow: "hidden", 
+                      gap: 0, 
+                      flex: 1,
+                      minHeight: "52px",
+                      transform: showAttachMenu ? "translateY(-100px)" : "translateY(0)",
+                      transition: "transform 0.25s ease-out"
+                    }}>
+                      {/* Attachment Button - Left side of input */}
+                      <button
+                        onClick={() => setShowAttachMenu(p => !p)}
+                        style={{
+                          background: "transparent",
+                          border: "none",
+                          color: showAttachMenu ? "var(--wa-green)" : "var(--wa-icon, #AEBAC1)",
+                          padding: "0 12px",
+                          cursor: "pointer",
+                          display: "flex",
+                          alignItems: "center",
+                          justifyContent: "center",
+                          transition: "color 0.2s",
+                        }}
+                        title="Attach"
+                      >
+                        <IoMdAttach style={{ fontSize: "22px", transform: showAttachMenu ? "rotate(45deg)" : "rotate(0deg)", transition: "transform 0.25s" }} />
+                      </button>
 
-                  <label htmlFor="fileInput" style={{
-                    display: "flex", alignItems: "center", justifyContent: "center",
-                    padding: "0 14px", cursor: "pointer", color: T.bodyGray, transition: "color 0.2s",
-                  }}
-                    onMouseEnter={e => e.currentTarget.style.color = T.orange}
-                    onMouseLeave={e => e.currentTarget.style.color = T.bodyGray}
-                  >
-                    <IoMdAttach style={{ fontSize: "22px" }} />
-                  </label>
-                  <input type="file" id="fileInput" multiple style={{ display: "none" }} onChange={handleFileChange} />
-                  <button
-                    onClick={handleSend}
-                    disabled={(!inputVal?.trim() && !selectedFile) || !receiverId || loading || !isCommunicationAllowed}
-                    style={{
-                      backgroundColor: T.orange, color: "#ffffff", border: "none",
-                      padding: "10px 18px", cursor: "pointer", minWidth: "52px", minHeight: "52px",
-                      display: "flex", alignItems: "center", justifyContent: "center",
-                      transition: "background-color 0.2s",
-                      opacity: (!inputVal?.trim() && !selectedFile) ? 0.5 : 1,
-                    }}
-                    onMouseEnter={e => { if (!e.currentTarget.disabled) e.currentTarget.style.backgroundColor = "#d94e18"; }}
-                    onMouseLeave={e => e.currentTarget.style.backgroundColor = T.orange}
-                  >
-                    <RiSendPlaneFill style={{ fontSize: "20px" }} />
-                  </button>
+                      <input
+                        ref={inputRef}
+                        value={inputVal}
+                        onChange={handleInputChange}
+                        onKeyDown={handleKeyPress}
+                        onPaste={handlePaste}
+                        onFocus={() => {
+                          // Only show tabs panel on focus, not the content
+                          setShowTabsPanel(true);
+                        }}
+                        disabled={!receiverId || loading || !isCommunicationAllowed}
+                        placeholder="Type a message"
+                        style={{
+                          flex: 1, border: "none", padding: "13px 16px",
+                          fontSize: "15px", outline: "none",
+                          backgroundColor: "transparent",
+                          color: "var(--wa-text-primary, #E9EDEF)",
+                          caretColor: "var(--wa-green, #00A884)",
+                          opacity: 1,
+                        }}
+                      />
+
+                      {/* Hidden file inputs */}
+                      <input ref={galleryInputRef} type="file" accept="image/*,video/*" multiple style={{ display: "none" }} onChange={handleFileChange} />
+                      <input ref={documentInputRef} type="file" accept=".pdf,.doc,.docx,.xls,.xlsx,.ppt,.pptx,.txt,.zip,.rar" multiple style={{ display: "none" }} onChange={handleFileChange} />
+                    </div>
+
+                    {/* Send Button - Only shows when typing */}
+                    {(inputVal?.trim() || selectedFile) && (
+                      <button
+                        onClick={handleSend}
+                        disabled={(!inputVal?.trim() && !selectedFile) || !receiverId || loading || !isCommunicationAllowed}
+                        style={{
+                          backgroundColor: "var(--wa-green, #00A884)",
+                          color: "#ffffff",
+                          border: "none",
+                          padding: "0",
+                          cursor: "pointer",
+                          width: "52px",
+                          height: "52px",
+                          borderRadius: "50%",
+                          display: "flex",
+                          alignItems: "center",
+                          justifyContent: "center",
+                          flexShrink: 0,
+                          marginLeft: "4px",
+                          transition: "background-color 0.2s, transform 0.1s",
+                        }}
+                        onMouseEnter={e => { if (!e.currentTarget.disabled) { e.currentTarget.style.backgroundColor = "#009070"; e.currentTarget.style.transform = "scale(1.05)"; } }}
+                        onMouseLeave={e => { e.currentTarget.style.backgroundColor = "var(--wa-green, #00A884)"; e.currentTarget.style.transform = "scale(1)"; }}
+                      >
+                        <RiSendPlaneFill style={{ fontSize: "20px" }} />
+                      </button>
+                    )}
+
+                    {/* ── Voice Button (Always Visible) ── */}
+                    {!inputVal?.trim() && !selectedFile && (
+                      <button
+                        onMouseDown={(e) => {
+                          touchStartXRef.current = e.clientX;
+                          setIsRecording(true);
+                          startVoiceRecording();
+                        }}
+                        onMouseUp={() => {
+                          if (isRecording) {
+                            stopVoiceRecording();
+                          }
+                        }}
+                        onMouseLeave={() => {
+                          if (isRecording) {
+                            stopVoiceRecording();
+                          }
+                        }}
+                        onTouchStart={(e) => {
+                          touchStartXRef.current = e.touches[0].clientX;
+                          setIsRecording(true);
+                          startVoiceRecording();
+                        }}
+                        onTouchEnd={() => {
+                          if (isRecording) {
+                            stopVoiceRecording();
+                          }
+                        }}
+                        style={{
+                          width: "52px",
+                          height: "52px",
+                          borderRadius: "50%",
+                          backgroundColor: isRecording ? "#FF4444" : "var(--wa-green, #00A884)",
+                          border: "none",
+                          color: "#ffffff",
+                          cursor: "pointer",
+                          display: "flex",
+                          alignItems: "center",
+                          justifyContent: "center",
+                          flexShrink: 0,
+                          transition: "background-color 0.2s, transform 0.1s",
+                          transform: isRecording ? "scale(1.1)" : "scale(1)",
+                        }}
+                        title={isRecording ? "Recording... Slide left to cancel" : "Hold to record voice message"}
+                      >
+                        {isRecording ? <BsStopFill style={{ fontSize: "18px" }} /> : <MdKeyboardVoice style={{ fontSize: "22px" }} />}
+                      </button>
+                    )}
+                  </div>
+
+                  {/* ── WhatsApp Style Tab Bar (Below Input) ── */}
+                  {showTabsPanel && (
+                    <div
+                      ref={tabsPanelRef}
+                      style={{
+                        display: "flex",
+                        alignItems: "center",
+                        justifyContent: "flex-start",
+                        gap: "8px",
+                        padding: "6px 12px",
+                        backgroundColor: "#fff",
+                        borderTop: "1px solid #E9EDEF",
+                        overflowX: "auto",
+                        scrollbarWidth: "none",
+                        animation: "slideUp 0.2s ease-out",
+                      }}>
+                      {/* ABC - Keyboard Button */}
+                      <button
+                        onClick={() => {
+                          setShowEmojiPanel(false);
+                          inputRef.current?.focus();
+                        }}
+                        style={{
+                          background: !showEmojiPanel ? "#00A884" : "#F0F2F5",
+                          border: "none",
+                          color: !showEmojiPanel ? "#fff" : "#667781",
+                          cursor: "pointer",
+                          padding: "6px 14px",
+                          borderRadius: "16px",
+                          fontSize: "13px",
+                          fontWeight: 600,
+                          transition: "all 0.15s ease",
+                          display: "flex",
+                          alignItems: "center",
+                          gap: "4px",
+                          whiteSpace: "nowrap",
+                          boxShadow: !showEmojiPanel ? "0 2px 4px rgba(0,168,132,0.3)" : "none",
+                        }}
+                      >
+                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                          <rect x="2" y="4" width="20" height="16" rx="2"/>
+                          <path d="M6 8h.01M6 12h.01M6 16h.01"/>
+                        </svg>
+                        ABC
+                      </button>
+
+                      {/* Emoji Button */}
+                      <button
+                        onClick={() => {
+                          setShowEmojiPanel(true);
+                          setActivePanelTab('emoji');
+                        }}
+                        style={{
+                          background: showEmojiPanel && activePanelTab === 'emoji' ? "#00A884" : "#F0F2F5",
+                          border: "none",
+                          color: showEmojiPanel && activePanelTab === 'emoji' ? "#fff" : "#667781",
+                          cursor: "pointer",
+                          padding: "6px 14px",
+                          borderRadius: "16px",
+                          fontSize: "13px",
+                          fontWeight: 600,
+                          transition: "all 0.15s ease",
+                          display: "flex",
+                          alignItems: "center",
+                          gap: "4px",
+                          whiteSpace: "nowrap",
+                          boxShadow: showEmojiPanel && activePanelTab === 'emoji' ? "0 2px 4px rgba(0,168,132,0.3)" : "none",
+                        }}
+                      >
+                        <span style={{ fontSize: "16px" }}>😊</span>
+                        Emoji
+                      </button>
+
+                      {/* GIF Button */}
+                      <button
+                        onClick={() => {
+                          setShowEmojiPanel(true);
+                          setActivePanelTab('gif');
+                          if (gifs.length === 0) fetchGifs('trending');
+                        }}
+                        style={{
+                          background: showEmojiPanel && activePanelTab === 'gif' ? "#00A884" : "#F0F2F5",
+                          border: "none",
+                          color: showEmojiPanel && activePanelTab === 'gif' ? "#fff" : "#667781",
+                          cursor: "pointer",
+                          padding: "6px 14px",
+                          borderRadius: "16px",
+                          fontSize: "13px",
+                          fontWeight: 600,
+                          transition: "all 0.15s ease",
+                          display: "flex",
+                          alignItems: "center",
+                          gap: "4px",
+                          whiteSpace: "nowrap",
+                          boxShadow: showEmojiPanel && activePanelTab === 'gif' ? "0 2px 4px rgba(0,168,132,0.3)" : "none",
+                        }}
+                      >
+                        <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor">
+                          <text x="2" y="14" fontSize="11" fontWeight="bold" fontFamily="Arial">GIF</text>
+                        </svg>
+                        GIF
+                      </button>
+
+                      {/* Stickers Button */}
+                      <button
+                        onClick={() => {
+                          setShowEmojiPanel(true);
+                          setActivePanelTab('stickers');
+                        }}
+                        style={{
+                          background: showEmojiPanel && activePanelTab === 'stickers' ? "#00A884" : "#F0F2F5",
+                          border: "none",
+                          color: showEmojiPanel && activePanelTab === 'stickers' ? "#fff" : "#667781",
+                          cursor: "pointer",
+                          padding: "6px 14px",
+                          borderRadius: "16px",
+                          fontSize: "13px",
+                          fontWeight: 600,
+                          transition: "all 0.15s ease",
+                          display: "flex",
+                          alignItems: "center",
+                          gap: "4px",
+                          whiteSpace: "nowrap",
+                          boxShadow: showEmojiPanel && activePanelTab === 'stickers' ? "0 2px 4px rgba(0,168,132,0.3)" : "none",
+                        }}
+                      >
+                        <span style={{ fontSize: "16px" }}>🎨</span>
+                        Stickers
+                      </button>
+
+                      {/* Close Button */}
+                      <button
+                        onClick={() => {
+                          setShowEmojiPanel(false);
+                          setShowTabsPanel(false);
+                        }}
+                        style={{
+                          background: "#F0F2F5",
+                          border: "none",
+                          color: "#667781",
+                          cursor: "pointer",
+                          padding: "6px",
+                          borderRadius: "50%",
+                          display: "flex",
+                          alignItems: "center",
+                          justifyContent: "center",
+                          marginLeft: "auto",
+                        }}
+                      >
+                        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                          <line x1="18" y1="6" x2="6" y2="18"/>
+                          <line x1="6" y1="6" x2="18" y2="18"/>
+                        </svg>
+                      </button>
+                    </div>
+                  )}
+
                 </div>
               )}
             </>
           )}
+
+          {/* ── WhatsApp Style Emoji/GIF/Stickers Panel ── */}
+          {showEmojiPanel && (
+            <div
+              ref={emojiPanelRef}
+              style={{
+                width: "100%",
+                height: "300px",
+                backgroundColor: "#F0F2F5",
+                borderTop: "1px solid #D1D7DB",
+                display: "flex",
+                flexDirection: "column",
+                borderRadius: "16px 16px 0 0",
+                marginTop: "8px",
+                boxShadow: "0 -2px 10px rgba(0,0,0,0.1)",
+                animation: "slideUp 0.2s ease-out",
+              }}
+            >
+              <style>{`
+                @keyframes slideUp {
+                  from { transform: translateY(100%); opacity: 0; }
+                  to { transform: translateY(0); opacity: 1; }
+                }
+              `}</style>
+
+              {/* Panel Content */}
+              <div style={{ flex: 1, overflow: "hidden", display: "flex", flexDirection: "column" }}>
+                {/* Emoji Tab */}
+                {activePanelTab === 'emoji' && (
+                  <div style={{
+                    flex: 1,
+                    overflowY: "auto",
+                    padding: "12px",
+                    display: "grid",
+                    gridTemplateColumns: "repeat(8, 1fr)",
+                    gap: "8px",
+                  }}>
+                    {stickers.map((emoji, idx) => (
+                      <button
+                        key={idx}
+                        onClick={() => addEmojiToInput(emoji)}
+                        style={{
+                          background: "transparent",
+                          border: "none",
+                          fontSize: "28px",
+                          cursor: "pointer",
+                          padding: "8px",
+                          borderRadius: "8px",
+                          transition: "all 0.15s",
+                        }}
+                        onMouseEnter={e => e.currentTarget.style.background = "rgba(0,0,0,0.05)"}
+                        onMouseLeave={e => e.currentTarget.style.background = "transparent"}
+                      >
+                        {emoji}
+                      </button>
+                    ))}
+                  </div>
+                )}
+
+                {/* GIF Tab */}
+                {activePanelTab === 'gif' && (
+                  <div style={{ flex: 1, display: "flex", flexDirection: "column" }}>
+                    {/* Search Bar */}
+                    <div style={{
+                      padding: "10px 12px",
+                      borderBottom: "1px solid var(--wa-border, #D1D7DB)",
+                      display: "flex",
+                      gap: "8px",
+                    }}>
+                      <input
+                        type="text"
+                        value={gifSearch}
+                        onChange={(e) => setGifSearch(e.target.value)}
+                        onKeyDown={(e) => {
+                          if (e.key === 'Enter') {
+                            fetchGifs(gifSearch || 'trending');
+                          }
+                        }}
+                        placeholder="Search GIFs..."
+                        style={{
+                          flex: 1,
+                          padding: "10px 14px",
+                          borderRadius: "20px",
+                          border: "1px solid var(--wa-border, #D1D7DB)",
+                          fontSize: "14px",
+                          outline: "none",
+                          backgroundColor: "#fff",
+                        }}
+                      />
+                      <button
+                        onClick={() => fetchGifs(gifSearch || 'trending')}
+                        style={{
+                          padding: "10px 16px",
+                          backgroundColor: "var(--wa-green, #00A884)",
+                          color: "#fff",
+                          border: "none",
+                          borderRadius: "20px",
+                          cursor: "pointer",
+                          fontSize: "14px",
+                          fontWeight: 500,
+                        }}
+                      >
+                        Search
+                      </button>
+                    </div>
+
+                    {/* GIF Grid */}
+                    <div style={{
+                      flex: 1,
+                      overflowY: "auto",
+                      padding: "12px",
+                      display: "grid",
+                      gridTemplateColumns: "repeat(3, 1fr)",
+                      gap: "8px",
+                    }}>
+                      {isLoadingGifs ? (
+                        <div style={{ gridColumn: "1 / -1", textAlign: "center", padding: "40px", color: "var(--wa-text-muted)" }}>
+                          Loading GIFs...
+                        </div>
+                      ) : gifs.length === 0 ? (
+                        <div style={{ gridColumn: "1 / -1", textAlign: "center", padding: "40px", color: "var(--wa-text-muted)" }}>
+                          No GIFs found. Try searching!
+                        </div>
+                      ) : (
+                        gifs.map((gif) => (
+                          <button
+                            key={gif.id}
+                            onClick={() => sendGif(gif.images.fixed_height_small.url)}
+                            style={{
+                              background: "transparent",
+                              border: "none",
+                              padding: "0",
+                              cursor: "pointer",
+                              borderRadius: "8px",
+                              overflow: "hidden",
+                              transition: "transform 0.2s",
+                            }}
+                            onMouseEnter={e => e.currentTarget.style.transform = "scale(1.05)"}
+                            onMouseLeave={e => e.currentTarget.style.transform = "scale(1)"}
+                          >
+                            <img
+                              src={gif.images.fixed_height_small_still?.url || gif.images.fixed_height_small.url}
+                              alt={gif.title}
+                              style={{
+                                width: "100%",
+                                height: "100px",
+                                objectFit: "cover",
+                                borderRadius: "8px",
+                              }}
+                              loading="lazy"
+                            />
+                          </button>
+                        ))
+                      )}
+                    </div>
+                  </div>
+                )}
+
+                {/* Stickers Tab */}
+                {activePanelTab === 'stickers' && (
+                  <div style={{
+                    flex: 1,
+                    overflowY: "auto",
+                    padding: "12px",
+                    display: "grid",
+                    gridTemplateColumns: "repeat(4, 1fr)",
+                    gap: "12px",
+                  }}>
+                    {/* Sample stickers - in real app these would come from a stickers API */}
+                    {['❤️', '🔥', '👍', '🎉', '😂', '😍', '🥳', '🎂', '🌹', '🌟', '💯', '✨', '🙏', '💪', '🤝', '🎁'].map((sticker, idx) => (
+                      <button
+                        key={idx}
+                        onClick={() => sendSticker(sticker)}
+                        style={{
+                          background: "#fff",
+                          border: "1px solid var(--wa-border, #D1D7DB)",
+                          fontSize: "40px",
+                          cursor: "pointer",
+                          padding: "16px",
+                          borderRadius: "12px",
+                          transition: "all 0.15s",
+                          display: "flex",
+                          alignItems: "center",
+                          justifyContent: "center",
+                        }}
+                        onMouseEnter={e => {
+                          e.currentTarget.style.background = "var(--wa-green-light, #E0F2F1)";
+                          e.currentTarget.style.transform = "scale(1.05)";
+                        }}
+                        onMouseLeave={e => {
+                          e.currentTarget.style.background = "#fff";
+                          e.currentTarget.style.transform = "scale(1)";
+                        }}
+                      >
+                        {sticker}
+                      </button>
+                    ))}
+                  </div>
+                )}
+              </div>
+            </div>
+          )}
+
+          {/* ── Image Upload Modal - Multiple Images Grid ── */}
+          {showImageUploadModal && selectedImages.length > 0 && (
+            <div style={{
+              position: "fixed",
+              top: 0,
+              left: 0,
+              right: 0,
+              bottom: 0,
+              backgroundColor: "rgba(0, 0, 0, 0.7)",
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "center",
+              zIndex: 1000,
+              padding: "20px",
+            }}>
+              <div style={{
+                backgroundColor: "#fff",
+                borderRadius: "24px",
+                padding: "32px",
+                maxWidth: "520px",
+                width: "100%",
+                maxHeight: "80vh",
+                overflowY: "auto",
+                boxShadow: "0 25px 80px rgba(0,0,0,0.4)",
+                animation: "slideUp 0.3s ease-out",
+              }}>
+                {/* Title */}
+                <h2 style={{
+                  margin: "0 0 8px 0",
+                  fontSize: "24px",
+                  fontWeight: 700,
+                  color: "#1a1a1a",
+                }}>
+                  📎 Send Files
+                </h2>
+                <p style={{
+                  margin: "0 0 24px 0",
+                  fontSize: "14px",
+                  color: "#666",
+                }}>
+                  {selectedImages.filter(img => img.selected).length} of {selectedImages.length} selected
+                </p>
+
+                {/* Multiple Images/Video - Horizontal Scroll */}
+                <div style={{
+                  display: "flex",
+                  flexDirection: "row",
+                  gap: "12px",
+                  marginBottom: "24px",
+                  overflowX: "auto",
+                  overflowY: "hidden",
+                  paddingBottom: "8px",
+                  scrollbarWidth: "thin",
+                  scrollbarColor: "#ccc transparent",
+                }}>
+                  {selectedImages.map((item, index) => (
+                    <div
+                      key={index}
+                      onClick={() => {
+                        const updated = [...selectedImages];
+                        updated[index].selected = !updated[index].selected;
+                        setSelectedImages(updated);
+                      }}
+                      style={{
+                        position: "relative",
+                        width: "120px",
+                        height: "120px",
+                        flexShrink: 0,
+                        borderRadius: "16px",
+                        overflow: "hidden",
+                        cursor: "pointer",
+                        border: item.selected ? "3px solid #00A884" : "3px solid transparent",
+                        boxShadow: item.selected ? "0 4px 12px rgba(0,168,132,0.3)" : "0 2px 8px rgba(0,0,0,0.1)",
+                        transition: "all 0.2s",
+                      }}
+                    >
+                      {/* Image, Video or Document Display */}
+                      {item.type === "image" ? (
+                        <img
+                          src={item.preview}
+                          alt={`Image ${index + 1}`}
+                          style={{
+                            width: "100%",
+                            height: "100%",
+                            objectFit: "cover",
+                          }}
+                        />
+                      ) : item.type === "video" ? (
+                        <div style={{
+                          width: "100%",
+                          height: "100%",
+                          backgroundColor: "#1a1a1a",
+                          display: "flex",
+                          alignItems: "center",
+                          justifyContent: "center",
+                          position: "relative",
+                        }}>
+                          <video
+                            src={item.preview}
+                            style={{
+                              width: "100%",
+                              height: "100%",
+                              objectFit: "cover",
+                            }}
+                          />
+                          {/* Video Icon Overlay */}
+                          <div style={{
+                            position: "absolute",
+                            bottom: "8px",
+                            right: "8px",
+                            backgroundColor: "rgba(0,0,0,0.7)",
+                            color: "#fff",
+                            padding: "4px 8px",
+                            borderRadius: "8px",
+                            fontSize: "12px",
+                            fontWeight: 600,
+                            display: "flex",
+                            alignItems: "center",
+                            gap: "4px",
+                          }}>
+                            ▶
+                          </div>
+                        </div>
+                      ) : (
+                        /* Document Card */
+                        <div style={{
+                          width: "100%",
+                          height: "100%",
+                          backgroundColor: "#f8f9fa",
+                          display: "flex",
+                          flexDirection: "column",
+                          alignItems: "center",
+                          justifyContent: "center",
+                          padding: "12px",
+                          boxSizing: "border-box",
+                        }}>
+                          {/* File Icon */}
+                          <div style={{
+                            fontSize: "36px",
+                            marginBottom: "8px",
+                          }}>
+                            {item.type === "pdf" ? "📄" :
+                             item.type === "word" ? "📝" :
+                             item.type === "excel" ? "📊" :
+                             item.type === "ppt" ? "📽️" :
+                             item.type === "zip" ? "🗜️" : "📎"}
+                          </div>
+                          {/* File Name */}
+                          <div style={{
+                            fontSize: "11px",
+                            fontWeight: 600,
+                            color: "#333",
+                            textAlign: "center",
+                            overflow: "hidden",
+                            textOverflow: "ellipsis",
+                            whiteSpace: "nowrap",
+                            width: "100%",
+                            marginBottom: "4px",
+                          }}>
+                            {item.fileName}
+                          </div>
+                          {/* File Size */}
+                          <div style={{
+                            fontSize: "10px",
+                            color: "#666",
+                          }}>
+                            {(item.fileSize / 1024 / 1024).toFixed(2)} MB
+                          </div>
+                        </div>
+                      )}
+                      {/* Selection checkmark */}
+                      {item.selected && (
+                        <div style={{
+                          position: "absolute",
+                          top: "-2px",
+                          right: "-2px",
+                          backgroundColor: "#00A884",
+                          color: "#fff",
+                          width: "24px",
+                          height: "24px",
+                          borderRadius: "50%",
+                          display: "flex",
+                          alignItems: "center",
+                          justifyContent: "center",
+                          fontSize: "14px",
+                          fontWeight: "bold",
+                          border: "2px solid #fff",
+                          zIndex: 2,
+                        }}>
+                          ✓
+                        </div>
+                      )}
+                      {/* Type Badge */}
+                      <div style={{
+                        position: "absolute",
+                        top: "8px",
+                        left: "8px",
+                        backgroundColor: item.type === "video" ? "rgba(220,53,69,0.9)" : 
+                                         item.type === "image" ? "rgba(0,168,132,0.9)" : 
+                                         "rgba(108,117,125,0.9)",
+                        color: "#fff",
+                        padding: "3px 8px",
+                        borderRadius: "6px",
+                        fontSize: "10px",
+                        fontWeight: 700,
+                        textTransform: "uppercase",
+                        letterSpacing: "0.5px",
+                      }}>
+                        {item.type === "video" ? "VIDEO" : 
+                         item.type === "image" ? "IMG" : 
+                         item.type === "pdf" ? "PDF" :
+                         item.type === "word" ? "DOC" :
+                         item.type === "excel" ? "XLS" :
+                         item.type === "ppt" ? "PPT" :
+                         item.type === "zip" ? "ZIP" : "FILE"}
+                      </div>
+                      {/* Hover overlay */}
+                      <div style={{
+                        position: "absolute",
+                        top: 0,
+                        left: 0,
+                        right: 0,
+                        bottom: 0,
+                        backgroundColor: item.selected ? "transparent" : "rgba(0,0,0,0.3)",
+                        display: "flex",
+                        alignItems: "center",
+                        justifyContent: "center",
+                        opacity: item.selected ? 0 : 1,
+                        transition: "opacity 0.2s",
+                      }}>
+                        <span style={{
+                          color: "#fff",
+                          fontSize: "20px",
+                          fontWeight: "bold",
+                        }}>+</span>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+
+                {/* Caption Input */}
+                <div style={{ marginBottom: "24px" }}>
+                  <label style={{
+                    display: "block",
+                    marginBottom: "10px",
+                    fontSize: "16px",
+                    fontWeight: 600,
+                    color: "#1a1a1a",
+                  }}>
+                    Add a caption
+                  </label>
+                  <textarea
+                    value={imageCaption}
+                    onChange={(e) => setImageCaption(e.target.value)}
+                    placeholder="Type a caption for your images..."
+                    style={{
+                      width: "100%",
+                      padding: "16px",
+                      borderRadius: "16px",
+                      border: "2px solid #e8e8e8",
+                      fontSize: "15px",
+                      outline: "none",
+                      boxSizing: "border-box",
+                      resize: "none",
+                      minHeight: "80px",
+                      fontFamily: "inherit",
+                    }}
+                    maxLength={200}
+                  />
+                  <div style={{
+                    textAlign: "right",
+                    fontSize: "12px",
+                    color: "#999",
+                    marginTop: "6px",
+                  }}>
+                    {imageCaption.length}/200
+                  </div>
+                </div>
+
+                {/* Action Buttons */}
+                <div style={{
+                  display: "flex",
+                  gap: "12px",
+                }}>
+                  <button
+                    onClick={cancelImageUpload}
+                    style={{
+                      flex: 1,
+                      padding: "16px 24px",
+                      borderRadius: "14px",
+                      border: "2px solid #e0e0e0",
+                      backgroundColor: "#fff",
+                      color: "#333",
+                      fontSize: "16px",
+                      fontWeight: 600,
+                      cursor: "pointer",
+                      transition: "all 0.2s",
+                    }}
+                    onMouseEnter={e => e.currentTarget.style.backgroundColor = "#f5f5f5"}
+                    onMouseLeave={e => e.currentTarget.style.backgroundColor = "#fff"}
+                  >
+                    Cancel
+                  </button>
+                  <button
+                    onClick={() => {
+                      // Send all selected files (images, videos, documents)
+                      const mediaToSend = selectedImages.filter(item => item.selected);
+                      if (mediaToSend.length === 0) {
+                        toast.error("Please select at least one file");
+                        return;
+                      }
+                      // Generate batch ID for grouping multiple media
+                      const batchId = mediaToSend.length > 1 ? `batch-${Date.now()}` : null;
+                      setCurrentBatchId(batchId);
+
+                      // Send each item
+                      mediaToSend.forEach(async (item) => {
+                        try {
+                          let messageType = "file";
+                          if (item.type === "video") messageType = "video";
+                          else if (item.type === "image") messageType = "file";
+                          else messageType = "file"; // documents
+
+                          const messageData = {
+                            receiver_id: receiverId,
+                            message_type: messageType,
+                            message: imageCaption?.trim() || "",
+                            file: item.file,
+                            batch_id: batchId, // For grouping in chat
+                          };
+                          await dispatch(sendMessage(messageData)).unwrap();
+                        } catch (err) {
+                          toast.error(`Failed to send ${item.type}`);
+                        }
+                      });
+                      setSelectedImages([]);
+                      setImageCaption("");
+                      setShowImageUploadModal(false);
+                      setCurrentBatchId(null);
+                      toast.success(`${mediaToSend.length} item(s) sent!`);
+                    }}
+                    disabled={selectedImages.filter(img => img.selected).length === 0}
+                    style={{
+                      flex: 1,
+                      padding: "16px 24px",
+                      borderRadius: "14px",
+                      border: "none",
+                      backgroundColor: selectedImages.filter(img => img.selected).length > 0 ? "#00A884" : "#ccc",
+                      color: "#fff",
+                      fontSize: "16px",
+                      fontWeight: 700,
+                      cursor: selectedImages.filter(img => img.selected).length > 0 ? "pointer" : "not-allowed",
+                      display: "flex",
+                      alignItems: "center",
+                      justifyContent: "center",
+                      gap: "8px",
+                      transition: "all 0.2s",
+                      boxShadow: selectedImages.filter(img => img.selected).length > 0 ? "0 4px 12px rgba(0,168,132,0.4)" : "none",
+                    }}
+                  >
+                    <span>Send {selectedImages.filter(img => img.selected).length > 0 && `(${selectedImages.filter(img => img.selected).length})`}</span>
+                    <span style={{ fontSize: "18px" }}>➤</span>
+                  </button>
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* WhatsApp Voice Recording & Menu Animations */}
+          <style>{`
+            @keyframes blink {
+              0%, 100% { opacity: 1; }
+              50% { opacity: 0.3; }
+            }
+            @keyframes slideLeft {
+              0%, 100% { transform: translateX(0); opacity: 0.5; }
+              50% { transform: translateX(-4px); opacity: 1; }
+            }
+            @keyframes slideUp {
+              from { transform: translateY(20px); opacity: 0; }
+              to { transform: translateY(0); opacity: 1; }
+            }
+            @keyframes wa-slide-up {
+              0% { transform: translateX(-50%) translateY(100%); opacity: 0; }
+              100% { transform: translateX(-50%) translateY(0); opacity: 1; }
+            }
+            @keyframes wa-camera-in {
+              0% { opacity: 0; transform: scale(0.9); }
+              100% { opacity: 1; transform: scale(1); }
+            }
+            .wa-attach-container {
+              animation: wa-slide-up 0.25s ease-out;
+            }
+            .wa-camera-modal {
+              animation: wa-camera-in 0.25s ease;
+            }
+            /* Camera responsive styles */
+            @media (max-width: 768px) {
+              .wa-camera-modal {
+                width: 100vw !important;
+                height: 100vh !important;
+                border-radius: 0 !important;
+                max-width: 100vw !important;
+                max-height: 100vh !important;
+              }
+            }
+            @media (max-width: 400px) {
+              .slide-text {
+                display: none;
+              }
+            }
+          `}</style>
         </div>
       </div>
+
+      {/* ════════════════════════════════════════
+          CAMERA MODAL – WhatsApp Style
+      ════════════════════════════════════════ */}
+      {showCameraModal && (
+        <div
+          onClick={(e) => { if (e.target === e.currentTarget) closeCamera(); }}
+          style={{
+            position: "fixed", inset: 0, zIndex: 9999,
+            backgroundColor: "rgba(0,0,0,0.95)",
+            display: "flex", alignItems: "center", justifyContent: "center",
+          }}
+        >
+          <div
+            className="wa-camera-modal"
+            style={{
+              position: "relative",
+              width: "min(95vw, 500px)",
+              height: "min(90vh, 700px)",
+              backgroundColor: "#000",
+              borderRadius: "20px",
+              overflow: "hidden",
+              animation: "wa-camera-in 0.25s ease",
+              boxShadow: "0 24px 80px rgba(0,0,0,0.8)",
+            }}
+          >
+            {/* Header */}
+            {/* Header - Close Button Only */}
+            <div style={{
+              position: "absolute", top: 0, left: 0, right: 0,
+              display: "flex", alignItems: "center", justifyContent: "flex-end",
+              padding: "16px 20px", zIndex: 10,
+              background: "linear-gradient(to bottom, rgba(0,0,0,0.5) 0%, transparent 100%)",
+            }}>
+              {/* Close */}
+              <button
+                onClick={closeCamera}
+                style={{
+                  background: "rgba(255,255,255,0.2)", border: "none", color: "#fff",
+                  width: "44px", height: "44px", borderRadius: "50%",
+                  display: "flex", alignItems: "center", justifyContent: "center",
+                  cursor: "pointer", backdropFilter: "blur(8px)", fontSize: "22px",
+                  transition: "background 0.2s",
+                }}
+                onMouseEnter={e => e.currentTarget.style.background = "rgba(239,68,68,0.6)"}
+                onMouseLeave={e => e.currentTarget.style.background = "rgba(255,255,255,0.2)"}
+              >
+                ✕
+              </button>
+            </div>
+
+            {/* Video / Preview */}
+            <div style={{ position: "absolute", inset: 0, backgroundColor: "#111", overflow: "hidden" }}>
+              {/* Live video feed */}
+              <video
+                ref={videoRef}
+                autoPlay
+                playsInline
+                muted
+                style={{
+                  width: "100%", height: "100%",
+                  objectFit: "cover",
+                  display: capturedPhoto ? "none" : "block",
+                  transform: cameraFacing === "user" ? "scaleX(-1)" : "scaleX(1)",
+                  transition: "transform 0.3s",
+                }}
+              />
+              {/* Captured photo preview */}
+              {capturedPhoto && (
+                <img
+                  src={capturedPhoto}
+                  alt="captured"
+                  style={{ width: "100%", height: "100%", objectFit: "cover", display: "block" }}
+                />
+              )}
+              {/* Recorded video preview */}
+              {recordedVideo?.url && (
+                <video
+                  src={recordedVideo.url}
+                  controls
+                  playsInline
+                  style={{ width: "100%", height: "100%", objectFit: "contain", display: "block", backgroundColor: "#000" }}
+                />
+              )}
+              {/* Hidden canvas for capture */}
+              <canvas ref={canvasRef} style={{ display: "none" }} />
+            </div>
+
+            {/* Mode Toggle - Photo/Video */}
+            {!capturedPhoto && !recordedVideo && (
+              <div style={{
+                position: "absolute",
+                bottom: "140px",
+                left: "50%",
+                transform: "translateX(-50%)",
+                display: "flex",
+                gap: "8px",
+                background: "rgba(0,0,0,0.6)",
+                padding: "6px",
+                borderRadius: "24px",
+                zIndex: 100,
+                backdropFilter: "blur(8px)",
+              }}>
+                <button
+                  onClick={() => setCameraMode('photo')}
+                  style={{
+                    padding: "8px 20px",
+                    borderRadius: "20px",
+                    border: "none",
+                    background: cameraMode === 'photo' ? "#fff" : "transparent",
+                    color: cameraMode === 'photo' ? "#000" : "#fff",
+                    fontSize: "14px",
+                    fontWeight: 600,
+                    cursor: "pointer",
+                    transition: "all 0.2s",
+                  }}
+                >
+                  Photo
+                </button>
+                <button
+                  onClick={() => setCameraMode('video')}
+                  style={{
+                    padding: "8px 20px",
+                    borderRadius: "20px",
+                    border: "none",
+                    background: cameraMode === 'video' ? "#fff" : "transparent",
+                    color: cameraMode === 'video' ? "#000" : "#fff",
+                    fontSize: "14px",
+                    fontWeight: 600,
+                    cursor: "pointer",
+                    transition: "all 0.2s",
+                  }}
+                >
+                  Video
+                </button>
+              </div>
+            )}
+
+            {/* Controls Bar */}
+            <div style={{
+              position: "absolute",
+              bottom: 0,
+              left: 0,
+              right: 0,
+              background: "linear-gradient(to top, rgba(0,0,0,0.85) 0%, transparent 100%)",
+              padding: "20px 24px 40px",
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "space-around",
+              zIndex: 10,
+            }}>
+              {!capturedPhoto && !recordedVideo ? (
+                <>
+                  {/* Retake placeholder (spacing) */}
+                  <div style={{ width: "52px" }} />
+
+                  {/* Photo Shutter / Video Record Button */}
+                  {cameraMode === 'photo' ? (
+                    <button
+                      onClick={capturePhoto}
+                      style={{
+                        width: "80px", height: "80px", borderRadius: "50%",
+                        background: "transparent",
+                        border: "4px solid #fff",
+                        cursor: "pointer",
+                        display: "flex", alignItems: "center", justifyContent: "center",
+                        transition: "transform 0.1s",
+                        padding: 0,
+                      }}
+                      onMouseDown={e => e.currentTarget.style.transform = "scale(0.92)"}
+                      onMouseUp={e => e.currentTarget.style.transform = "scale(1)"}
+                    >
+                      <div style={{
+                        width: "64px", height: "64px", borderRadius: "50%",
+                        backgroundColor: "#fff",
+                      }} />
+                    </button>
+                  ) : (
+                    <button
+                      onMouseDown={startVideoRecording}
+                      onMouseUp={stopVideoRecording}
+                      onMouseLeave={isRecordingVideo ? stopVideoRecording : undefined}
+                      onTouchStart={startVideoRecording}
+                      onTouchEnd={stopVideoRecording}
+                      style={{
+                        width: "80px", height: "80px", borderRadius: "50%",
+                        background: isRecordingVideo ? "#ff3131" : "transparent",
+                        border: "4px solid #fff",
+                        cursor: "pointer",
+                        display: "flex", alignItems: "center", justifyContent: "center",
+                        transition: "all 0.2s",
+                        padding: 0,
+                      }}
+                    >
+                      <div style={{
+                        width: isRecordingVideo ? "32px" : "64px",
+                        height: isRecordingVideo ? "32px" : "64px",
+                        borderRadius: isRecordingVideo ? "8px" : "50%",
+                        backgroundColor: "#ff3131",
+                        transition: "all 0.2s",
+                      }} />
+                    </button>
+                  )}
+
+                  {/* Flip Camera */}
+                  <button
+                    onClick={flipCamera}
+                    style={{
+                      width: "56px", height: "56px", borderRadius: "50%",
+                      background: "rgba(255,255,255,0.15)", border: "none", color: "#fff",
+                      fontSize: "24px", cursor: "pointer", display: "flex",
+                      alignItems: "center", justifyContent: "center",
+                      backdropFilter: "blur(8px)", transition: "background 0.2s",
+                    }}
+                    onMouseEnter={e => e.currentTarget.style.background = "rgba(255,255,255,0.28)"}
+                    onMouseLeave={e => e.currentTarget.style.background = "rgba(255,255,255,0.15)"}
+                  >
+                    🔄
+                  </button>
+                </>
+              ) : capturedPhoto ? (
+                <>
+                  {/* Retake Photo */}
+                  <button
+                    onClick={() => setCapturedPhoto(null)}
+                    style={{
+                      display: "flex", alignItems: "center", gap: "8px",
+                      background: "rgba(255,255,255,0.15)", border: "none", color: "#fff",
+                      padding: "12px 20px", borderRadius: "28px", cursor: "pointer",
+                      fontSize: "14px", fontWeight: 600, backdropFilter: "blur(8px)",
+                      transition: "background 0.2s",
+                    }}
+                    onMouseEnter={e => e.currentTarget.style.background = "rgba(255,255,255,0.25)"}
+                    onMouseLeave={e => e.currentTarget.style.background = "rgba(255,255,255,0.15)"}
+                  >
+                    🔁 Retake
+                  </button>
+
+                  {/* Send Photo */}
+                  <button
+                    onClick={sendCapturedPhoto}
+                    style={{
+                      display: "flex", alignItems: "center", gap: "8px",
+                      background: "var(--wa-green, #F0591F)", border: "none", color: "#fff",
+                      padding: "12px 24px", borderRadius: "28px", cursor: "pointer",
+                      fontSize: "14px", fontWeight: 700,
+                      boxShadow: "0 4px 16px rgba(240,89,31,0.4)",
+                      transition: "transform 0.15s, box-shadow 0.15s",
+                    }}
+                    onMouseEnter={e => { e.currentTarget.style.transform = "scale(1.04)"; e.currentTarget.style.boxShadow = "0 6px 20px rgba(240,89,31,0.5)"; }}
+                    onMouseLeave={e => { e.currentTarget.style.transform = "scale(1)"; e.currentTarget.style.boxShadow = "0 4px 16px rgba(240,89,31,0.4)"; }}
+                  >
+                    <svg viewBox="0 0 24 24" width="18" height="18" fill="currentColor"><path d="M2.01 21L23 12 2.01 3 2 10l15 2-15 2z"/></svg>
+                    Send
+                  </button>
+                </>
+              ) : recordedVideo ? (
+                <>
+                  {/* Retake Video */}
+                  <button
+                    onClick={cancelVideoRecording}
+                    style={{
+                      display: "flex", alignItems: "center", gap: "8px",
+                      background: "rgba(255,255,255,0.15)", border: "none", color: "#fff",
+                      padding: "12px 20px", borderRadius: "28px", cursor: "pointer",
+                      fontSize: "14px", fontWeight: 600, backdropFilter: "blur(8px)",
+                      transition: "background 0.2s",
+                    }}
+                    onMouseEnter={e => e.currentTarget.style.background = "rgba(255,255,255,0.25)"}
+                    onMouseLeave={e => e.currentTarget.style.background = "rgba(255,255,255,0.15)"}
+                  >
+                    🔁 Retake
+                  </button>
+
+                  {/* Send Video */}
+                  <button
+                    onClick={sendRecordedVideo}
+                    style={{
+                      display: "flex", alignItems: "center", gap: "8px",
+                      background: "var(--wa-green, #F0591F)", border: "none", color: "#fff",
+                      padding: "12px 24px", borderRadius: "28px", cursor: "pointer",
+                      fontSize: "14px", fontWeight: 700,
+                      boxShadow: "0 4px 16px rgba(240,89,31,0.4)",
+                      transition: "transform 0.15s, box-shadow 0.15s",
+                    }}
+                    onMouseEnter={e => { e.currentTarget.style.transform = "scale(1.04)"; e.currentTarget.style.boxShadow = "0 6px 20px rgba(240,89,31,0.5)"; }}
+                    onMouseLeave={e => { e.currentTarget.style.transform = "scale(1)"; e.currentTarget.style.boxShadow = "0 4px 16px rgba(240,89,31,0.4)"; }}
+                  >
+                    <svg viewBox="0 0 24 24" width="18" height="18" fill="currentColor"><path d="M2.01 21L23 12 2.01 3 2 10l15 2-15 2z"/></svg>
+                    Send
+                  </button>
+                </>
+              ) : null}
+            </div>
+
+            {/* Video Recording Timer */}
+            {isRecordingVideo && (
+              <div style={{
+                position: "absolute",
+                top: "60px",
+                left: "50%",
+                transform: "translateX(-50%)",
+                background: "rgba(0,0,0,0.6)",
+                color: "#fff",
+                padding: "8px 16px",
+                borderRadius: "20px",
+                display: "flex",
+                alignItems: "center",
+                gap: "8px",
+                zIndex: 100,
+              }}>
+                <span style={{
+                  width: "10px",
+                  height: "10px",
+                  backgroundColor: "#ff3131",
+                  borderRadius: "50%",
+                  animation: "blink 1s infinite",
+                }} />
+                <span style={{ fontSize: "14px", fontWeight: 500 }}>
+                  {formatVideoTime(videoRecordingTime)}
+                </span>
+              </div>
+            )}
+          </div>
+        </div>
+      )}
 
       {/* ── OFFER MODAL ── */}
       <Modal open={open} onClose={resetOfferForm}>
@@ -4392,159 +6823,582 @@ const Chatting = () => {
           }
         }
       `}</style>
-      {lightboxMedia && createPortal((
+      {lightboxMedia && (() => {
+        const activeMedia = (activeLightboxIndex >= 0 && conversationMedia && conversationMedia[activeLightboxIndex]) ? conversationMedia[activeLightboxIndex] : lightboxMedia;
+        return createPortal((
+          <div 
+            onClick={(e) => {
+              if (e.target === e.currentTarget) {
+                setLightboxMedia(null);
+              }
+            }}
+            style={{
+              position: "fixed",
+              top: 0,
+              left: 0,
+              width: "100vw",
+              height: "100vh",
+              backgroundColor: "rgba(10, 10, 10, 0.96)",
+              backdropFilter: "blur(12px)",
+              WebkitBackdropFilter: "blur(12px)",
+              zIndex: 100010,
+              display: "flex",
+              flexDirection: "column",
+              justifyContent: "space-between",
+              boxSizing: "border-box",
+              userSelect: "none"
+            }}
+          >
+            <style>{`
+              .lightbox-thumbnail-scroll::-webkit-scrollbar {
+                height: 4px;
+              }
+              .lightbox-thumbnail-scroll::-webkit-scrollbar-track {
+                background: transparent;
+              }
+              .lightbox-thumbnail-scroll::-webkit-scrollbar-thumb {
+                background: rgba(255, 255, 255, 0.2);
+                border-radius: 2px;
+              }
+              @media (max-width: 768px) {
+                .lightbox-content-wrapper {
+                  padding: 10px 16px !important;
+                }
+                .lightbox-nav-arrow {
+                  width: 40px !important;
+                  height: 40px !important;
+                  font-size: 18px !important;
+                }
+                .lightbox-nav-left {
+                  left: 10px !important;
+                }
+                .lightbox-nav-right {
+                  right: 10px !important;
+                }
+                .lightbox-media-display {
+                  max-height: 60vh !important;
+                }
+                .lightbox-title-info {
+                  max-width: 160px !important;
+                  top: 15px !important;
+                  left: 15px !important;
+                }
+                .lightbox-controls-bar {
+                  top: 15px !important;
+                  right: 15px !important;
+                }
+              }
+            `}</style>
+
+            {/* Floating Control Bar */}
+            <div className="lightbox-controls-bar" style={{
+              position: "absolute",
+              top: "20px",
+              right: "20px",
+              display: "flex",
+              alignItems: "center",
+              gap: "14px",
+              zIndex: 100015
+            }}>
+              <button 
+                onClick={() => setLightboxMedia(null)}
+                style={{
+                  background: "rgba(239, 68, 68, 0.8)",
+                  border: "1px solid rgba(255, 255, 255, 0.15)",
+                  color: "#ffffff",
+                  fontSize: "20px",
+                  cursor: "pointer",
+                  display: "flex",
+                  alignItems: "center",
+                  justifyContent: "center",
+                  width: "42px",
+                  height: "42px",
+                  borderRadius: "50%",
+                  boxShadow: "0 4px 10px rgba(0,0,0,0.3)",
+                  transition: "all 0.2s"
+                }}
+                onMouseEnter={(e) => e.currentTarget.style.backgroundColor = "#ef4444"}
+                onMouseLeave={(e) => e.currentTarget.style.backgroundColor = "rgba(239, 68, 68, 0.8)"}
+                title="Close (Esc)"
+              >
+                ✕
+              </button>
+            </div>
+
+            {/* Media Center Content Row with Navigation Arrows */}
+            <div className="lightbox-content-wrapper" style={{
+              flex: 1,
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "center",
+              position: "relative",
+              width: "100%",
+              height: "calc(100% - 150px)",
+              overflow: "hidden",
+              padding: "20px 80px",
+              boxSizing: "border-box"
+            }}>
+              
+              {/* Left Nav Arrow */}
+              {activeLightboxIndex > 0 && (
+                <button
+                  className="lightbox-nav-arrow lightbox-nav-left"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    setLightboxMedia(conversationMedia[activeLightboxIndex - 1]);
+                  }}
+                  style={{
+                    position: "absolute",
+                    left: "20px",
+                    top: "50%",
+                    transform: "translateY(-50%)",
+                    width: "48px",
+                    height: "48px",
+                    borderRadius: "50%",
+                    backgroundColor: "rgba(30, 30, 30, 0.6)",
+                    border: "1px solid rgba(255,255,255,0.15)",
+                    color: "#fff",
+                    fontSize: "24px",
+                    display: "flex",
+                    alignItems: "center",
+                    justifyContent: "center",
+                    cursor: "pointer",
+                    zIndex: 100012,
+                    transition: "all 0.2s",
+                  }}
+                  onMouseEnter={(e) => {
+                    e.currentTarget.style.backgroundColor = "rgba(30, 30, 30, 0.9)";
+                    e.currentTarget.style.transform = "translateY(-50%) scale(1.08)";
+                  }}
+                  onMouseLeave={(e) => {
+                    e.currentTarget.style.backgroundColor = "rgba(30, 30, 30, 0.6)";
+                    e.currentTarget.style.transform = "translateY(-50%) scale(1)";
+                  }}
+                  title="Previous"
+                >
+                  ‹
+                </button>
+              )}
+
+              {/* Main Media Display Wrapper */}
+              <div 
+                onClick={(e) => {
+                  if (e.target === e.currentTarget) {
+                    setLightboxMedia(null);
+                  }
+                }}
+                style={{
+                  display: "flex",
+                  flexDirection: "column",
+                  alignItems: "center",
+                  justifyContent: "center",
+                  width: "100%",
+                  height: "100%"
+                }}
+              >
+                {activeMedia.type === "image" ? (
+                  <img 
+                    className="lightbox-media-display"
+                    src={activeMedia.url} 
+                    alt="Viewer" 
+                    style={{
+                      maxHeight: "72vh",
+                      maxWidth: "100%",
+                      objectFit: "contain",
+                      borderRadius: "8px",
+                      boxShadow: "0 10px 35px rgba(0,0,0,0.8)",
+                      transition: "transform 0.2s"
+                    }}
+                  />
+                ) : activeMedia.type === "video" ? (
+                  <video 
+                    className="lightbox-media-display"
+                    src={activeMedia.url} 
+                    controls 
+                    autoPlay
+                    style={{
+                      maxHeight: "72vh",
+                      maxWidth: "100%",
+                      borderRadius: "8px",
+                      boxShadow: "0 10px 35px rgba(0,0,0,0.8)"
+                    }}
+                  />
+                ) : activeMedia.type === "pdf" ? (
+                  <iframe 
+                    src={activeMedia.url} 
+                    title="PDF Viewer"
+                    style={{
+                      width: "85vw",
+                      height: "75vh",
+                      border: "none",
+                      borderRadius: "8px",
+                      boxShadow: "0 10px 35px rgba(0,0,0,0.8)",
+                      backgroundColor: "#ffffff"
+                    }}
+                  />
+                ) : null}
+
+                {/* Index Counter */}
+                {activeLightboxIndex >= 0 && conversationMedia.length > 0 && (
+                  <div style={{
+                    color: "rgba(255, 255, 255, 0.8)",
+                    fontSize: "14px",
+                    marginTop: "16px",
+                    fontWeight: 500,
+                    backgroundColor: "rgba(0,0,0,0.5)",
+                    padding: "4px 12px",
+                    borderRadius: "12px",
+                    letterSpacing: "0.5px",
+                    boxShadow: "0 2px 8px rgba(0,0,0,0.2)"
+                  }}>
+                    {activeLightboxIndex + 1} of {conversationMedia.length}
+                  </div>
+                )}
+              </div>
+
+              {/* Right Nav Arrow */}
+              {activeLightboxIndex >= 0 && activeLightboxIndex < conversationMedia.length - 1 && (
+                <button
+                  className="lightbox-nav-arrow lightbox-nav-right"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    setLightboxMedia(conversationMedia[activeLightboxIndex + 1]);
+                  }}
+                  style={{
+                    position: "absolute",
+                    right: "20px",
+                    top: "50%",
+                    transform: "translateY(-50%)",
+                    width: "48px",
+                    height: "48px",
+                    borderRadius: "50%",
+                    backgroundColor: "rgba(30, 30, 30, 0.6)",
+                    border: "1px solid rgba(255,255,255,0.15)",
+                    color: "#fff",
+                    fontSize: "24px",
+                    display: "flex",
+                    alignItems: "center",
+                    justifyContent: "center",
+                    cursor: "pointer",
+                    zIndex: 100012,
+                    transition: "all 0.2s",
+                  }}
+                  onMouseEnter={(e) => {
+                    e.currentTarget.style.backgroundColor = "rgba(30, 30, 30, 0.9)";
+                    e.currentTarget.style.transform = "translateY(-50%) scale(1.08)";
+                  }}
+                  onMouseLeave={(e) => {
+                    e.currentTarget.style.backgroundColor = "rgba(30, 30, 30, 0.6)";
+                    e.currentTarget.style.transform = "translateY(-50%) scale(1)";
+                  }}
+                  title="Next"
+                >
+                  ›
+                </button>
+              )}
+
+            </div>
+
+            {/* Bottom Thumbnails Section */}
+            {activeLightboxIndex >= 0 && conversationMedia.length > 0 && (
+              <div style={{
+                width: "100%",
+                backgroundColor: "rgba(15, 15, 15, 0.85)",
+                borderTop: "1px solid rgba(255, 255, 255, 0.08)",
+                padding: "12px 0 20px 0",
+                display: "flex",
+                justifyContent: "center",
+                zIndex: 100015
+              }}>
+                <div 
+                  className="lightbox-thumbnail-scroll"
+                  style={{
+                    display: "flex",
+                    gap: "10px",
+                    overflowX: "auto",
+                    padding: "4px 20px",
+                    maxWidth: "90vw",
+                    scrollbarWidth: "thin",
+                    scrollBehavior: "smooth"
+                  }}
+                >
+                  {conversationMedia.map((item, idx) => {
+                    const isActive = idx === activeLightboxIndex;
+                    return (
+                      <div 
+                        key={idx} 
+                        ref={isActive ? activeThumbnailRef : null}
+                        onClick={() => setLightboxMedia(item)}
+                        style={{
+                          position: "relative",
+                          flex: "0 0 54px",
+                          height: "54px",
+                          borderRadius: "6px",
+                          overflow: "hidden",
+                          cursor: "pointer",
+                          border: isActive ? "3px solid #f0591f" : "1.5px solid rgba(255,255,255,0.25)",
+                          opacity: isActive ? 1 : 0.45,
+                          transition: "all 0.2s",
+                          boxSizing: "border-box",
+                          backgroundColor: "#1c1c1e"
+                        }}
+                        onMouseEnter={(e) => {
+                          if (!isActive) e.currentTarget.style.opacity = "0.85";
+                        }}
+                        onMouseLeave={(e) => {
+                          if (!isActive) e.currentTarget.style.opacity = "0.45";
+                        }}
+                      >
+                        {item.type === "image" ? (
+                          <img 
+                            src={item.url} 
+                            alt="Thumb" 
+                            style={{ width: "100%", height: "100%", objectFit: "cover" }} 
+                          />
+                        ) : (
+                          <div style={{ width: "100%", height: "100%", position: "relative" }}>
+                            <video 
+                              src={item.url} 
+                              preload="metadata"
+                              muted
+                              style={{ width: "100%", height: "100%", objectFit: "cover" }} 
+                            />
+                            <div style={{
+                              position: "absolute",
+                              top: 0, left: 0, right: 0, bottom: 0,
+                              display: "flex", alignItems: "center", justifyContent: "center",
+                              backgroundColor: "rgba(0,0,0,0.35)",
+                              color: "#fff",
+                              fontSize: "11px"
+                            }}>
+                              ▶
+                            </div>
+                          </div>
+                        )}
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+            )}
+          </div>
+        ), document.body);
+      })()}
+
+      {/* ── Gallery Modal (For viewing all batch images) ── */}
+      {showGalleryModal && createPortal((
         <div 
           onClick={(e) => {
             if (e.target === e.currentTarget) {
-              setLightboxMedia(null);
+              setShowGalleryModal(false);
+              setGalleryMedia([]);
             }
           }}
           style={{
             position: "fixed",
-            top: 0,
-            left: 0,
-            width: "100vw",
-            height: "100vh",
-            backgroundColor: "rgba(11, 20, 26, 0.98)",
-            zIndex: 100010,
+            top: 0, left: 0, right: 0, bottom: 0,
+            backgroundColor: "rgba(0,0,0,0.95)",
+            zIndex: 2147483647,
             display: "flex",
             flexDirection: "column",
-            justifyContent: "space-between"
+            padding: "20px",
           }}
         >
-          {/* Floating Control Bar (WhatsApp style) */}
+          {/* Header */}
           <div style={{
-            position: "absolute",
-            top: "20px",
-            right: "20px",
             display: "flex",
+            justifyContent: "space-between",
             alignItems: "center",
-            gap: "14px",
-            zIndex: 100015
+            marginBottom: "20px",
           }}>
-            <button 
-              onClick={() => handleDownload(lightboxMedia.filePath, lightboxMedia.fileName, lightboxMedia.msgId)}
-              style={{
-                background: "rgba(11, 20, 26, 0.8)",
-                border: "1px solid rgba(255, 255, 255, 0.1)",
-                color: "#ffffff",
-                fontSize: "18px",
-                cursor: "pointer",
-                display: "flex",
-                alignItems: "center",
-                justifyContent: "center",
-                width: "42px",
-                height: "42px",
-                borderRadius: "50%",
-                boxShadow: "0 4px 10px rgba(0,0,0,0.3)",
-                transition: "background 0.2s"
+            <h3 style={{ color: "#fff", margin: 0, fontSize: "18px" }}>
+              📷 All Photos ({galleryMedia.length})
+            </h3>
+            <button
+              onClick={() => {
+                setShowGalleryModal(false);
+                setGalleryMedia([]);
               }}
-              onMouseEnter={(e) => e.currentTarget.style.backgroundColor = "rgba(11, 20, 26, 0.95)"}
-              onMouseLeave={(e) => e.currentTarget.style.backgroundColor = "rgba(11, 20, 26, 0.8)"}
-              title="Download"
-            >
-              ⬇️
-            </button>
-            <button 
-              onClick={() => setLightboxMedia(null)}
               style={{
-                background: "rgba(239, 68, 68, 0.85)",
-                border: "1px solid rgba(255, 255, 255, 0.15)",
-                color: "#ffffff",
+                background: "rgba(255,255,255,0.2)",
+                border: "none",
+                color: "#fff",
+                width: "40px",
+                height: "40px",
+                borderRadius: "50%",
+                cursor: "pointer",
                 fontSize: "20px",
-                cursor: "pointer",
                 display: "flex",
                 alignItems: "center",
                 justifyContent: "center",
-                width: "42px",
-                height: "42px",
-                borderRadius: "50%",
-                boxShadow: "0 4px 10px rgba(0,0,0,0.3)",
-                transition: "all 0.2s"
               }}
-              onMouseEnter={(e) => {
-                e.currentTarget.style.backgroundColor = "#ef4444";
-              }}
-              onMouseLeave={(e) => {
-                e.currentTarget.style.backgroundColor = "rgba(239, 68, 68, 0.85)";
-              }}
-              title="Close (Esc)"
             >
               ✕
             </button>
           </div>
-
-          {/* Top-Left File Title Info */}
-          <div style={{
-            position: "absolute",
-            top: "20px",
-            left: "20px",
-            color: "#ffffff",
-            backgroundColor: "rgba(11, 20, 26, 0.8)",
-            padding: "8px 16px",
-            borderRadius: "20px",
-            fontSize: "13px",
-            fontWeight: 500,
-            border: "1px solid rgba(255, 255, 255, 0.1)",
-            zIndex: 100015,
-            maxWidth: "calc(100% - 150px)",
-            textOverflow: "ellipsis",
-            overflow: "hidden",
-            whiteSpace: "nowrap"
-          }}>
-            {lightboxMedia.fileName ? lightboxMedia.fileName.replace(/^\d+_/, "") : "Media Viewer"}
-          </div>
-
-          {/* Media Center Content */}
+          
+          {/* Scrollable Grid */}
           <div style={{
             flex: 1,
-            display: "flex",
-            alignItems: "center",
-            justifyContent: "center",
-            padding: "20px",
-            overflow: "hidden"
+            overflowY: "auto",
+            display: "grid",
+            gridTemplateColumns: "repeat(auto-fill, minmax(150px, 1fr))",
+            gap: "12px",
+            padding: "10px",
           }}>
-            {lightboxMedia.type === "image" ? (
-              <img 
-                src={lightboxMedia.url} 
-                alt="Viewer" 
-                style={{
-                  maxHeight: "85vh",
-                  maxWidth: "95vw",
-                  objectFit: "contain",
-                  borderRadius: "4px",
-                  boxShadow: "0 10px 30px rgba(0,0,0,0.5)"
+            {galleryMedia.map((media, idx) => (
+              <div
+                key={idx}
+                onClick={() => {
+                  setLightboxMedia(media);
                 }}
-              />
-            ) : lightboxMedia.type === "video" ? (
-              <video 
-                src={lightboxMedia.url} 
-                controls 
-                autoPlay
                 style={{
-                  maxHeight: "85vh",
-                  maxWidth: "95vw",
-                  borderRadius: "4px",
-                  boxShadow: "0 10px 30px rgba(0,0,0,0.5)"
+                  aspectRatio: "1",
+                  cursor: "pointer",
+                  borderRadius: "8px",
+                  overflow: "hidden",
+                  position: "relative",
                 }}
-              />
-            ) : lightboxMedia.type === "pdf" ? (
-              <iframe 
-                src={lightboxMedia.url} 
-                title="PDF Viewer"
-                style={{
-                  width: "90vw",
-                  height: "80vh",
-                  border: "none",
-                  borderRadius: "6px",
-                  boxShadow: "0 10px 30px rgba(0,0,0,0.5)",
-                  backgroundColor: "#ffffff"
-                }}
-              />
-            ) : null}
+              >
+                {media.type === "image" ? (
+                  <img
+                    src={media.url}
+                    alt={media.fileName}
+                    style={{
+                      width: "100%",
+                      height: "100%",
+                      objectFit: "cover",
+                    }}
+                  />
+                ) : (
+                  <div style={{
+                    width: "100%",
+                    height: "100%",
+                    backgroundColor: "#1a1a1a",
+                    display: "flex",
+                    alignItems: "center",
+                    justifyContent: "center",
+                    position: "relative",
+                  }}>
+                    <video
+                      src={media.url}
+                      style={{
+                        width: "100%",
+                        height: "100%",
+                        objectFit: "cover",
+                      }}
+                    />
+                    <div style={{
+                      position: "absolute",
+                      bottom: "8px",
+                      right: "8px",
+                      backgroundColor: "rgba(0,0,0,0.7)",
+                      color: "#fff",
+                      padding: "4px 8px",
+                      borderRadius: "4px",
+                      fontSize: "12px",
+                    }}>▶</div>
+                  </div>
+                )}
+              </div>
+            ))}
           </div>
         </div>
       ), document.body)}
+
+      {/* ── Attachment Menu Portal (Outside all containers) ── */}
+      {createPortal(
+        <div
+          className="wa-attach-container"
+          onClick={e => e.stopPropagation()}
+          style={{
+            position: "fixed",
+            bottom: "12px",
+            left: "50%",
+            transform: showAttachMenu ? "translateX(-50%) scale(1)" : "translateX(-50%) scale(0.95)",
+            opacity: showAttachMenu ? 1 : 0,
+            pointerEvents: showAttachMenu ? "auto" : "none",
+            display: showAttachMenu ? "grid" : "none",
+            gridTemplateColumns: "repeat(3, 1fr)",
+            gap: "20px",
+            padding: "20px 24px",
+            backgroundColor: "#ffffff",
+            borderRadius: "20px 20px 0 0",
+            boxShadow: "0 -8px 32px rgba(0,0,0,0.2)",
+            zIndex: 2147483647,
+            width: "95%",
+            maxWidth: "420px",
+            transition: "all 0.25s ease-out"
+          }}
+        >
+          {/* Gallery */}
+          <button
+            onClick={() => { setShowAttachMenu(false); galleryInputRef.current?.click(); }}
+            style={{
+              display: "flex", flexDirection: "column", alignItems: "center", gap: "8px",
+              background: "transparent", border: "none", cursor: "pointer",
+              padding: "12px", borderRadius: "16px",
+              color: "#666", fontSize: "13px", fontWeight: 500,
+              transition: "all 0.15s",
+            }}
+            onMouseEnter={e => { e.currentTarget.style.background = "rgba(0,0,0,0.05)"; }}
+            onMouseLeave={e => { e.currentTarget.style.background = "transparent"; }}
+          >
+            <span style={{
+              width: "60px", height: "60px", borderRadius: "16px",
+              backgroundColor: "#7C3AED",
+              display: "flex", alignItems: "center", justifyContent: "center", fontSize: "28px",
+              boxShadow: "0 4px 12px rgba(124, 58, 237, 0.3)"
+            }}>🖼️</span>
+            Gallery
+          </button>
+
+          {/* Camera */}
+          <button
+            onClick={() => { setShowAttachMenu(false); openCamera(); }}
+            style={{
+              display: "flex", flexDirection: "column", alignItems: "center", gap: "8px",
+              background: "transparent", border: "none", cursor: "pointer",
+              padding: "12px", borderRadius: "16px",
+              color: "#666", fontSize: "13px", fontWeight: 500,
+              transition: "all 0.15s",
+            }}
+            onMouseEnter={e => { e.currentTarget.style.background = "rgba(0,0,0,0.05)"; }}
+            onMouseLeave={e => { e.currentTarget.style.background = "transparent"; }}
+          >
+            <span style={{
+              width: "60px", height: "60px", borderRadius: "16px",
+              backgroundColor: "#DC2626",
+              display: "flex", alignItems: "center", justifyContent: "center", fontSize: "28px",
+              boxShadow: "0 4px 12px rgba(220, 38, 38, 0.3)"
+            }}>📷</span>
+            Camera
+          </button>
+
+          {/* Document */}
+          <button
+            onClick={() => { setShowAttachMenu(false); documentInputRef.current?.click(); }}
+            style={{
+              display: "flex", flexDirection: "column", alignItems: "center", gap: "8px",
+              background: "transparent", border: "none", cursor: "pointer",
+              padding: "12px", borderRadius: "16px",
+              color: "#666", fontSize: "13px", fontWeight: 500,
+              transition: "all 0.15s",
+            }}
+            onMouseEnter={e => { e.currentTarget.style.background = "rgba(0,0,0,0.05)"; }}
+            onMouseLeave={e => { e.currentTarget.style.background = "transparent"; }}
+          >
+            <span style={{
+              width: "60px", height: "60px", borderRadius: "16px",
+              backgroundColor: "#2563EB",
+              display: "flex", alignItems: "center", justifyContent: "center", fontSize: "28px",
+              boxShadow: "0 4px 12px rgba(37, 99, 235, 0.3)"
+            }}>📄</span>
+            Document
+          </button>
+        </div>,
+        document.body
+      )}
     </>
   );
 };

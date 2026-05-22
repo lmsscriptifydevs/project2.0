@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useState, useMemo } from "react";
 import { useDispatch, useSelector } from "react-redux";
-import ChatWindow from "../components/ChatWindow";
+import Chating from "../components/frelancerChat/Chat/Chating";
 import Navbar from "../components/Navbar";
 import { fetchMessages } from "../redux/slices/messageSlice";
 import { useUserData } from "../utils/useLocalStorage";
@@ -51,6 +51,16 @@ const FreelanceInbox = () => {
     setIsMobileChatOpen(false);
     setSelectedConversation(null);
   };
+
+  // Listen to Redux state changes for selectedConversation (from Close Chat)
+  const reduxSelectedConversation = useSelector((state) => state.messages?.selectedConversation);
+  
+  useEffect(() => {
+    if (reduxSelectedConversation === null && selectedConversation !== null) {
+      setSelectedConversation(null);
+      setIsMobileChatOpen(false);
+    }
+  }, [reduxSelectedConversation]);
 
   const toggleProfile = () => {
     setShowProfileSidebar(!showProfileSidebar);

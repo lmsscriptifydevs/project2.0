@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo } from "react";
+import React, { useEffect, useMemo, useState, useCallback } from "react";
 import { useLocation, useNavigate, useParams } from "react-router-dom";
 import { useDispatch, useSelector } from "../redux/store/store";
 import { formatDistanceToNow, format } from "date-fns";
@@ -10,6 +10,7 @@ import emptyProfile from "../assets/emptyProfileModal.webp";
 import { getUserGigs } from "../redux/slices/offersSlice";
 import { UserRating } from "../redux/slices/ratingSlice";
 import { titleToSlug } from "../utils/helpers";
+import axios from "axios";
 
 function stripHtmlTags(html) {
   if (typeof html !== "string") return "";
@@ -27,6 +28,113 @@ const ProfileOtherPerson = () => {
   
   const { userGigs } = useSelector((state) => state.offers);
   const { userRatingDetain, userallRating } = useSelector((state) => state.rating);
+
+  // Follow system state
+  const [followStatus, setFollowStatus] = useState({
+    isFollowing: false,
+    followersCount: 0,
+    followingCount: 0
+  });
+  const [isFollowLoading, setIsFollowLoading] = useState(false);
+
+  // Get current user from localStorage
+  const currentUser = JSON.parse(localStorage.getItem("user") || "{}");
+  const currentUserRole = currentUser?.role || "";
+  const targetUserRole = userGigs?.role || "";
+
+  // Check if follow is allowed between roles
+  const canFollow = useCallback((followerRole, followingRole) => {
+    const isFollowerClient = followerRole?.toLowerCase().includes("client");
+    const isFollowerExpert = followerRole?.toLowerCase().includes("expert") || followerRole?.toLowerCase().includes("freelancer");
+    const isFollowerBD = followerRole?.toLowerCase().includes("bidder") || followerRole?.toLowerCase().includes("middleman") || followerRole?.toLowerCase().includes("company representative");
+    
+    const isFollowingClient = followingRole?.toLowerCase().includes("client");
+    const isFollowingExpert = followingRole?.toLowerCase().includes("expert") || followingRole?.toLowerCase().includes("freelancer");
+    const isFollowingBD = followingRole?.toLowerCase().includes("bidder") || followingRole?.toLowerCase().includes("middleman") || followingRole?.toLowerCase().includes("company representative");
+    
+    // Block: Client ↔ Expert, Client ↔ Client
+    if (isFollowerClient && isFollowingExpert) return false;
+    if (isFollowerExpert && isFollowingClient) return false;
+    if (isFollowerClient && isFollowingClient) return false;
+    
+    // Allow: Client ↔ BD, BD ↔ Client, BD ↔ BD, BD ↔ Expert, Expert ↔ BD, Expert ↔ Expert
+    return true;
+  }, []);
+
+  // Check if follow button should show
+  const showFollowButton = canFollow(currentUserRole, targetUserRole);
+
+  // Fetch follow status
+  useEffect(() => {
+    if (!userId || !currentUser?.id) return;
+    
+    const fetchFollowStatus = async () => {
+      try {
+        const response = await axios.get(`/api/follow/status/${userId}`);
+        setFollowStatus(response.data);
+      } catch (err) {
+        console.log("Follow status fetch failed");
+      }
+    };
+
+    fetchFollowStatus();
+  }, [userId, currentUser?.id]);
+
+  // Handle follow/unfollow with real-time updates
+  const handleFollowToggle = async () => {
+    if (!currentUser?.id || !userId) return;
+    
+    setIsFollowLoading(true);
+    try {
+      if (followStatus.isFollowing) {
+        // UNFOLLOW
+        await axios.post(`/api/follow/unfollow`, { following_id: userId });
+        
+        // Update local state immediately for real-time feel
+        setFollowStatus(prev => ({
+          ...prev,
+          isFollowing: false,
+          followersCount: Math.max(0, prev.followersCount - 1)
+        }));
+        
+        console.log("✅ Unfollowed successfully");
+      } else {
+        // FOLLOW
+        await axios.post(`/api/follow/follow`, { following_id: userId });
+        
+        // Update local state immediately for real-time feel
+        setFollowStatus(prev => ({
+          ...prev,
+          isFollowing: true,
+          followersCount: prev.followersCount + 1
+        }));
+        
+        console.log("✅ Followed successfully");
+        
+        // Create conversation for mutual follow (follow back)
+        try {
+          await axios.post('/api/conversations', {
+            participant_id: userId,
+            type: 'direct'
+          });
+          console.log("💬 Conversation created for chat");
+        } catch (convErr) {
+          // Conversation might already exist
+          console.log("Conversation already exists or error:", convErr.message);
+        }
+      }
+      
+      // Refresh follow status from server to ensure sync
+      const response = await axios.get(`/api/follow/status/${userId}`);
+      setFollowStatus(response.data);
+      
+    } catch (err) {
+      console.error("❌ Follow action failed:", err.response?.data?.message || err.message);
+      alert(err.response?.data?.message || "Failed to follow/unfollow");
+    } finally {
+      setIsFollowLoading(false);
+    }
+  };
 
   const handleGigClick = (gig) => {
     const slug = titleToSlug(gig.title || "gig");
@@ -366,6 +474,41 @@ const ProfileOtherPerson = () => {
                   </span>
                 )}
               </div>
+              
+              {/* Follow Stats */}
+              <div className="d-flex flex-wrap gap-3 mt-2 mb-3 justify-content-md-start justify-content-center">
+                <span style={{ color: 'var(--light-gray-hover)', fontSize: '14px' }}>
+                  <strong style={{ color: 'var(--pure-white)' }}>{followStatus.followersCount}</strong> Followers
+                </span>
+                <span style={{ color: 'var(--light-gray-hover)', fontSize: '14px' }}>
+                  <strong style={{ color: 'var(--pure-white)' }}>{followStatus.followingCount}</strong> Following
+                </span>
+              </div>
+              
+              {/* Follow Button - Only show if allowed by role restrictions */}
+              {showFollowButton && currentUser?.id !== userId && (
+                <div className="d-flex gap-2 justify-content-md-start justify-content-center">
+                  <button
+                    onClick={handleFollowToggle}
+                    disabled={isFollowLoading}
+                    style={{
+                      backgroundColor: followStatus.isFollowing ? 'transparent' : 'var(--primary-orange)',
+                      color: followStatus.isFollowing ? 'var(--primary-orange)' : '#fff',
+                      border: `2px solid var(--primary-orange)`,
+                      padding: '8px 24px',
+                      borderRadius: '8px',
+                      fontWeight: 600,
+                      fontSize: '14px',
+                      cursor: isFollowLoading ? 'not-allowed' : 'pointer',
+                      opacity: isFollowLoading ? 0.7 : 1,
+                      transition: 'all 0.3s',
+                      minWidth: '120px',
+                    }}
+                  >
+                    {isFollowLoading ? '...' : followStatus.isFollowing ? 'Following' : 'Follow'}
+                  </button>
+                </div>
+              )}
             </div>
           </div>
         </div>

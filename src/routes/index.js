@@ -54,6 +54,7 @@ const AdminChat = lazy(() => import("../pages/admin-panel/chat/AdminChat"));
 
 // Main App (secondary pages)
 const ProfileOtherPerson = lazy(() => import("../pages/ProfileOtherPerson"));
+const FollowersPage = lazy(() => import("../pages/FollowersPage"));
 const BuyerRequest = lazy(() => import("../pages/BuyerRequest"));
 const JobInvitation = lazy(
   () => import("../pages/freelancers/FreelancersJobInvitations"),
@@ -1080,6 +1081,15 @@ function AppRoutes() {
               element={
                 <EnhancedProtectedRoute>
                   <ProfileOtherPerson />
+                </EnhancedProtectedRoute>
+              }
+            />
+
+            <Route
+              path="/followers"
+              element={
+                <EnhancedProtectedRoute>
+                  <FollowersPage />
                 </EnhancedProtectedRoute>
               }
             />

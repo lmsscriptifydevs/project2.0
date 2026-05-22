@@ -173,7 +173,7 @@ const ChatUserProfile = () => {
       )}
 
       {/* Custom Styles for Scroll and Hover */}
-      <style jsx>{`
+      <style>{`
         .custom-profile-scroll::-webkit-scrollbar {
           width: 3px;
         }

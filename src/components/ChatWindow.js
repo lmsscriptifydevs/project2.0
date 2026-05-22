@@ -1,20 +1,22 @@
 import { useEffect, useRef, useState } from "react";
 import { useDispatch } from "react-redux";
 import { sendMessage } from "../redux/slices/messageSlice";
-
-
-
 import { useUserData } from "../utils/useLocalStorage";
-import { BsCheckAll, BsCheck } from "react-icons/bs";
-import { AiOutlineSend, AiOutlinePaperClip, AiOutlineSmile } from "react-icons/ai";
+import { BsCheckAll, BsCheck, BsImages, BsFileEarmark } from "react-icons/bs";
+import { AiOutlineSend, AiOutlinePaperClip, AiOutlineSmile, AiOutlineCamera } from "react-icons/ai";
+import { HiOutlinePhotograph, HiOutlineCamera, HiOutlineDocumentText } from "react-icons/hi";
 
 const ChatWindow = ({ conversation }) => {
   const dispatch = useDispatch();
   const [newMessage, setNewMessage] = useState("");
   const [showWarning, setShowWarning] = useState(false);
+  const [showMediaOptions, setShowMediaOptions] = useState(false);
   const messagesEndRef = useRef(null);
   const messagesContainerRef = useRef(null);
   const isInitialLoad = useRef(true);
+  const fileInputRef = useRef(null);
+  const imageInputRef = useRef(null);
+  const cameraInputRef = useRef(null);
   
   const currentUser = useUserData();
 
@@ -101,6 +103,45 @@ const ChatWindow = ({ conversation }) => {
         content: content
       }));
       setNewMessage("");
+    }
+  };
+
+  const handleFileUpload = (file, type) => {
+    if (!file) return;
+    
+    // Create FormData for file upload
+    const formData = new FormData();
+    formData.append('file', file);
+    formData.append('conversation_id', conversation.id);
+    formData.append('type', type);
+    
+    // Here you would typically send to your API
+    console.log(`Uploading ${type}:`, file.name);
+    
+    // For now, just dispatch a message with file info
+    dispatch(sendMessage({
+      conversationId: conversation.id,
+      content: `📎 ${file.name}`,
+      file: file,
+      fileType: type
+    }));
+    
+    setShowMediaOptions(false);
+  };
+
+  const handleMediaOptionClick = (option) => {
+    switch(option) {
+      case 'gallery':
+        imageInputRef.current?.click();
+        break;
+      case 'camera':
+        cameraInputRef.current?.click();
+        break;
+      case 'document':
+        fileInputRef.current?.click();
+        break;
+      default:
+        break;
     }
   };
 
@@ -227,7 +268,67 @@ const ChatWindow = ({ conversation }) => {
       {/* Message Input */}
       <div className="gt-chat-input-area">
         <button className="gt-icon-btn"><AiOutlineSmile size={24} /></button>
-        <button className="gt-icon-btn"><AiOutlinePaperClip size={24} /></button>
+        
+        {/* Media Options Button */}
+        <div className="gt-media-btn-wrapper">
+          <button 
+            className="gt-icon-btn" 
+            onClick={() => setShowMediaOptions(!showMediaOptions)}
+          >
+            <AiOutlinePaperClip size={24} />
+          </button>
+          
+          {/* WhatsApp Style Media Options */}
+          {showMediaOptions && (
+            <div className="gt-media-options">
+              <button 
+                className="gt-media-option"
+                onClick={() => handleMediaOptionClick('gallery')}
+              >
+                <BsImages size={20} />
+                <span>Gallery</span>
+              </button>
+              <button 
+                className="gt-media-option"
+                onClick={() => handleMediaOptionClick('camera')}
+              >
+                <AiOutlineCamera size={20} />
+                <span>Camera</span>
+              </button>
+              <button 
+                className="gt-media-option"
+                onClick={() => handleMediaOptionClick('document')}
+              >
+                <BsFileEarmark size={20} />
+                <span>Document</span>
+              </button>
+            </div>
+          )}
+        </div>
+        
+        {/* Hidden File Inputs */}
+        <input
+          ref={imageInputRef}
+          type="file"
+          accept="image/*"
+          style={{ display: 'none' }}
+          onChange={(e) => handleFileUpload(e.target.files[0], 'image')}
+        />
+        <input
+          ref={cameraInputRef}
+          type="file"
+          accept="image/*"
+          capture="environment"
+          style={{ display: 'none' }}
+          onChange={(e) => handleFileUpload(e.target.files[0], 'camera')}
+        />
+        <input
+          ref={fileInputRef}
+          type="file"
+          accept=".pdf,.doc,.docx,.txt,.xls,.xlsx,.ppt,.pptx"
+          style={{ display: 'none' }}
+          onChange={(e) => handleFileUpload(e.target.files[0], 'document')}
+        />
         
         <form onSubmit={handleSubmit} className="gt-input-form">
           <input
@@ -435,6 +536,80 @@ const ChatWindow = ({ conversation }) => {
         .gt-icon-btn:hover {
           background-color: var(--inbox-hover);
           color: var(--inbox-text-main);
+        }
+
+        /* ─── MEDIA OPTIONS (WhatsApp Style) ─── */
+        .gt-media-btn-wrapper {
+          position: relative;
+        }
+
+        .gt-media-options {
+          position: absolute;
+          bottom: 100%;
+          left: 0;
+          background: var(--inbox-surface);
+          border: 1px solid var(--inbox-border);
+          border-radius: 12px;
+          box-shadow: 0 8px 24px rgba(0,0,0,0.15);
+          padding: 8px;
+          margin-bottom: 8px;
+          z-index: 9999;
+          min-width: 140px;
+          animation: slideUp 0.2s ease-out;
+          display: block;
+        }
+
+        @keyframes slideUp {
+          from {
+            opacity: 0;
+            transform: translateY(10px);
+          }
+          to {
+            opacity: 1;
+            transform: translateY(0);
+          }
+        }
+
+        .gt-media-option {
+          display: flex;
+          align-items: center;
+          gap: 12px;
+          width: 100%;
+          padding: 12px 16px;
+          border: none;
+          background: transparent;
+          border-radius: 8px;
+          cursor: pointer;
+          transition: background-color 0.2s;
+          color: var(--inbox-text-main);
+          font-size: 14px;
+          font-weight: 500;
+          text-align: left;
+        }
+
+        .gt-media-option:hover {
+          background-color: var(--inbox-hover);
+        }
+
+        .gt-media-option:active {
+          background-color: var(--inbox-primary-light);
+        }
+
+        /* Mobile Responsive */
+        @media (max-width: 768px) {
+          .gt-media-options {
+            left: auto;
+            right: 0;
+          }
+          
+          .gt-chat-input-area {
+            padding: 12px 16px;
+            gap: 8px;
+          }
+          
+          .gt-messages-container {
+            padding: 16px 20px;
+          }
         }
 
         .gt-input-form {

@@ -7,32 +7,26 @@ import Chating from '../../components/frelancerChat/Chat/Chating';
 import ChatUserProfile from '../../components/frelancerChat/Chat/ChatUserProfile';
 import Navbar from '../../components/Navbar';
 import { AiOutlineArrowLeft } from 'react-icons/ai';
-import { useLocation } from 'react-router-dom';
-import { toast } from 'react-toastify';
-
 const Chat = () => {
   const dispatch = useDispatch();
-  const location = useLocation();
   const { selectedConversation } = useSelector((state) => state.message);
   
-  // Local state for theme, mobile/sidebar toggles
   const [themeMode, setThemeMode] = useState(() => localStorage.getItem("inboxTheme") || "dark");
   const [isMobileChatOpen, setIsMobileChatOpen] = useState(false);
   const [showProfileSidebar, setShowProfileSidebar] = useState(false);
 
   useEffect(() => {
-    const handleThemeChange = (e) => {
-      setThemeMode(e.detail);
-    };
+    const handleThemeChange = (e) => setThemeMode(e.detail);
     window.addEventListener('inboxThemeChanged', handleThemeChange);
     return () => window.removeEventListener('inboxThemeChanged', handleThemeChange);
   }, []);
 
-  // Whenever a conversation is selected via Redux, open the mobile chat window
   useEffect(() => {
     if (selectedConversation) {
       setIsMobileChatOpen(true);
-      setShowProfileSidebar(false); // Auto-hide profile when switching chats
+      setShowProfileSidebar(false);
+    } else {
+      setIsMobileChatOpen(false);
     }
   }, [selectedConversation]);
 
@@ -40,16 +34,13 @@ const Chat = () => {
     const handleToggleProfile = () => setShowProfileSidebar(prev => !prev);
     const handleMobileBack = () => {
       setIsMobileChatOpen(false);
-      setTimeout(() => {
-        dispatch(setSelectedConversation(null));
-      }, 300); // clear after animation
+      setTimeout(() => dispatch(setSelectedConversation(null)), 300);
     };
     const handleCloseProfile = () => setShowProfileSidebar(false);
 
     window.addEventListener('toggleProfileSidebar', handleToggleProfile);
     window.addEventListener('mobileBackToList', handleMobileBack);
     window.addEventListener('closeProfileSidebar', handleCloseProfile);
-    
     return () => {
       window.removeEventListener('toggleProfileSidebar', handleToggleProfile);
       window.removeEventListener('mobileBackToList', handleMobileBack);
@@ -62,92 +53,137 @@ const Chat = () => {
       <Navbar FirstNav='none' />
 
       <div className="gt-inbox-layout">
-        
-        {/* Sidebar: Users List */}
         <div className={`gt-inbox-sidebar ${isMobileChatOpen ? 'mobile-hide' : ''}`}>
           <UsersChat />
         </div>
 
-        {/* Center: Main Chat Window */}
         <div className={`gt-inbox-main ${isMobileChatOpen ? 'mobile-show' : ''}`}>
           <div style={{ height: '100%', width: '100%', display: 'flex', flexDirection: 'column' }}>
             <Chating />
           </div>
         </div>
 
-        {/* Right: User Profile Detail */}
         <div className={`gt-profile-sidebar ${showProfileSidebar ? 'open' : ''}`}>
           <div className="gt-profile-sidebar-inner">
             <div className="d-md-none" style={{ position: 'absolute', top: '16px', left: '16px', zIndex: 100 }}>
-              <button 
+              <button
                 onClick={() => setShowProfileSidebar(false)}
-                style={{ background: 'rgba(255,255,255,0.1)', border: '1px solid rgba(255,255,255,0.2)', color: '#fff', borderRadius: '50%', width: '40px', height: '40px', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', backdropFilter: 'blur(10px)' }}
+                style={{ background: 'rgba(255,255,255,0.1)', border: '1px solid rgba(255,255,255,0.15)', color: '#fff', borderRadius: '50%', width: '40px', height: '40px', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer' }}
               >
                 <AiOutlineArrowLeft size={20} />
               </button>
             </div>
-            
             <div className="d-none d-md-flex" style={{ position: 'absolute', top: '16px', right: '16px', zIndex: 100 }}>
-              <button 
+              <button
                 onClick={() => setShowProfileSidebar(false)}
-                style={{ background: 'transparent', border: 'none', color: 'var(--inbox-text-muted)', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '8px', transition: 'color 0.2s' }}
-                onMouseEnter={(e) => e.currentTarget.style.color = '#fff'}
-                onMouseLeave={(e) => e.currentTarget.style.color = 'var(--inbox-text-muted)'}
+                style={{ background: 'transparent', border: 'none', color: 'var(--wa-icon)', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '8px' }}
               >
-                <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg>
+                <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
               </button>
             </div>
-            
             <ChatUserProfile />
           </div>
         </div>
-
       </div>
 
-      {/* 🚀 PREMIUM GRAPETASK DARK THEME CSS 🚀 */}
       <style>{`
+        /* ════════════════════════════════════════
+           DARK: GrapeTask Navy + Orange + White
+        ════════════════════════════════════════ */
         .gt-inbox-wrapper.theme-dark {
-          --inbox-bg: #020617;
-          --inbox-surface: rgba(255, 255, 255, 0.02);
-          --inbox-border: rgba(255, 255, 255, 0.06);
-          --inbox-border-mid: rgba(255, 255, 255, 0.07);
-          --inbox-primary: #f0591f;
-          --inbox-primary-hover: #d44d1a;
-          --inbox-primary-light: rgba(240, 89, 31, 0.15);
-          --inbox-text-main: #ffffff;
-          --inbox-text-muted: #d4d4d8;
-          --inbox-text-light: #a1a1aa;
-          --inbox-text-body: #71717a;
-          --inbox-hover: rgba(255, 255, 255, 0.04);
-          --inbox-orange-border: rgba(240, 89, 31, 0.4);
+          --wa-bg:           #060D18;
+          --wa-panel:        #0B1628;
+          --wa-panel-hover:  #112036;
+          --wa-panel-active: #112036;
+          --wa-input-bg:     #142030;
+          --wa-divider:      #1C2E46;
+          --wa-text-primary: #FFFFFF;
+          --wa-text-second:  #A8BCCE;
+          --wa-text-muted:   #6B84A0;
+          --wa-green:        #F0591F;
+          --wa-green-badge:  #F0591F;
+          --wa-green-time:   #F07030;
+          --wa-sent-bubble:  #1E3A6B;
+          --wa-recv-bubble:  #0D1E33;
+          --wa-icon:         #A8BCCE;
+          --wa-icon-hover:   #FFFFFF;
+          --wa-header-bg:    #0B1628;
+          --wa-search-bg:    #112036;
+          --wa-bubble-text:  #FFFFFF;
+          --wa-time-text:    #6B84A0;
+          --wa-tick-blue:    #F0591F;
+          --wa-shadow:       rgba(0,0,0,0.6);
+          --wa-online:       #22C55E;
+
+          --inbox-bg:            #060D18;
+          --inbox-surface:       #0B1628;
+          --inbox-border:        #1C2E46;
+          --inbox-border-mid:    #1C2E46;
+          --inbox-primary:       #F0591F;
+          --inbox-primary-hover: #D44D1A;
+          --inbox-primary-light: rgba(240,89,31,0.15);
+          --inbox-text-main:     #FFFFFF;
+          --inbox-text-muted:    #A8BCCE;
+          --inbox-text-light:    #A8BCCE;
+          --inbox-text-body:     #6B84A0;
+          --inbox-hover:         #112036;
+          --inbox-orange-border: rgba(240,89,31,0.4);
+          --inbox-card-bg:       #0B1628;
         }
 
+        /* ════════════════════════════════════════
+           LIGHT: WhatsApp exact light theme
+        ════════════════════════════════════════ */
         .gt-inbox-wrapper.theme-light {
-          --inbox-bg: #f8fafc;
-          --inbox-surface: #ffffff;
-          --inbox-border: #cbd5e1;
-          --inbox-border-mid: #cbd5e1;
-          --inbox-primary: #f0591f;
-          --inbox-primary-hover: #d44d1a;
-          --inbox-primary-light: rgba(240, 89, 31, 0.08);
-          --inbox-text-main: #0f172a;
-          --inbox-text-muted: #334155;
-          --inbox-text-light: #64748b;
-          --inbox-text-body: #475569;
-          --inbox-hover: rgba(15, 23, 42, 0.04);
-          --inbox-orange-border: rgba(240, 89, 31, 0.2);
+          --wa-bg:           #F0F2F5;
+          --wa-panel:        #FFFFFF;
+          --wa-panel-hover:  #F5F6F6;
+          --wa-panel-active: #F0F2F5;
+          --wa-input-bg:     #F0F2F5;
+          --wa-divider:      #E9EDEF;
+          --wa-text-primary: #111B21;
+          --wa-text-second:  #667781;
+          --wa-text-muted:   #8696A0;
+          --wa-green:        #F0591F;
+          --wa-green-badge:  #F0591F;
+          --wa-green-time:   #F07030;
+          --wa-sent-bubble:  #FFEBE3;
+          --wa-recv-bubble:  #FFFFFF;
+          --wa-icon:         #54656F;
+          --wa-icon-hover:   #111B21;
+          --wa-header-bg:    #F0F2F5;
+          --wa-search-bg:    #F0F2F5;
+          --wa-bubble-text:  #111B21;
+          --wa-time-text:    #667781;
+          --wa-tick-blue:    #F0591F;
+          --wa-shadow:       rgba(0,0,0,0.08);
+          --wa-online:       #25D366;
+
+          --inbox-bg:            #F0F2F5;
+          --inbox-surface:       #FFFFFF;
+          --inbox-border:        #E9EDEF;
+          --inbox-border-mid:    #E9EDEF;
+          --inbox-primary:       #F0591F;
+          --inbox-primary-hover: #D44D1A;
+          --inbox-primary-light: rgba(240,89,31,0.15);
+          --inbox-text-main:     #111B21;
+          --inbox-text-muted:    #667781;
+          --inbox-text-light:    #667781;
+          --inbox-text-body:     #8696A0;
+          --inbox-hover:         #F0F2F5;
+          --inbox-orange-border: rgba(240,89,31,0.4);
+          --inbox-card-bg:       #FFFFFF;
         }
 
-        .gt-inbox-wrapper, .gt-inbox-wrapper *, .gt-inbox-sidebar, .gt-inbox-main, .gt-profile-sidebar {
-          transition: background-color 0.25s ease, border-color 0.25s ease, color 0.25s ease;
-        }
-
+        /* ════════════════════════════════════════
+           BASE LAYOUT
+        ════════════════════════════════════════ */
         .gt-inbox-wrapper {
           display: flex;
           flex-direction: column;
           height: 100vh;
-          background-color: var(--inbox-bg);
-          font-family: 'Inter', system-ui, sans-serif;
+          background-color: var(--wa-bg);
+          font-family: 'Segoe UI', system-ui, -apple-system, sans-serif;
           overflow: hidden;
         }
 
@@ -155,25 +191,23 @@ const Chat = () => {
           display: flex;
           flex: 1;
           overflow: hidden;
-          background-color: var(--inbox-bg);
+          background-color: var(--wa-bg);
           position: relative;
-          padding: 24px;
-          gap: 20px;
           max-width: 1600px;
           margin: 0 auto;
           width: 100%;
+          box-shadow: 0 0 60px var(--wa-shadow);
         }
 
-        /* ─── LEFT SIDEBAR (CHATS LIST) ─── */
+        /* ── LEFT SIDEBAR ── */
         .gt-inbox-sidebar {
-          width: 340px;
-          background-color: var(--inbox-surface);
-          border: 1px solid var(--inbox-border);
-          border-radius: 20px;
+          width: 380px;
+          min-width: 380px;
+          background-color: var(--wa-panel);
+          border-right: 1px solid var(--wa-divider);
           display: flex;
           flex-direction: column;
           flex-shrink: 0;
-          box-shadow: 0 10px 30px rgba(0,0,0,0.4);
           overflow: hidden;
           transition: transform 0.3s cubic-bezier(0.4, 0, 0.2, 1);
           position: relative;
@@ -181,96 +215,86 @@ const Chat = () => {
         }
         .gt-inbox-sidebar > div { height: 100%; display: flex; flex-direction: column; }
 
-        /* ─── MAIN CHAT AREA ─── */
+        /* ── MAIN CHAT AREA ── */
         .gt-inbox-main {
           flex: 1;
           display: flex;
           flex-direction: column;
-          background-color: var(--inbox-surface);
-          border-radius: 20px;
-          border: 1px solid var(--inbox-border);
-          box-shadow: 0 10px 30px rgba(0,0,0,0.4);
+          background-color: var(--wa-bg);
           position: relative;
           overflow: hidden;
           transition: transform 0.3s cubic-bezier(0.4, 0, 0.2, 1);
-          z-index: 15;
+          z-index: 5;
         }
         .gt-inbox-main > div { height: 100%; display: flex; flex-direction: column; }
 
-        /* ─── RIGHT SIDEBAR (PROFILE INFO) ─── */
-        @keyframes gt-anim-gradient {
-          0% { background-position: 0% 50%; }
-          50% { background-position: 100% 50%; }
-          100% { background-position: 0% 50%; }
-        }
-
+        /* ── RIGHT PROFILE SIDEBAR ── */
         .gt-profile-sidebar {
-          width: 360px;
-          background: linear-gradient(-45deg, rgba(2,6,23,0.8), rgba(15,23,42,0.9), rgba(240,89,31,0.05));
-          background-size: 200% 200%;
-          animation: gt-anim-gradient 10s ease infinite;
-          backdrop-filter: blur(30px);
-          border: 1px solid var(--inbox-border);
-          border-top: 1px solid rgba(255,255,255,0.1);
-          border-radius: 24px;
+          width: 380px;
+          background-color: var(--wa-panel);
+          border-left: 1px solid var(--wa-divider);
           display: flex;
           flex-direction: column;
           flex-shrink: 0;
-          box-shadow: 0 15px 35px rgba(0,0,0,0.6);
           overflow: hidden;
-          transition: width 0.4s cubic-bezier(0.4, 0, 0.2, 1), margin 0.4s cubic-bezier(0.4, 0, 0.2, 1), opacity 0.3s, border 0.3s;
+          transition: width 0.35s cubic-bezier(0.4, 0, 0.2, 1), opacity 0.3s;
           z-index: 20;
-          margin-left: 0;
         }
         .gt-profile-sidebar:not(.open) {
-          width: 0;
-          margin-left: -20px; /* Removes the flex gap on desktop */
-          border-width: 0;
-          opacity: 0;
-          pointer-events: none;
+          width: 0; border-width: 0; opacity: 0; pointer-events: none;
         }
-        .gt-profile-sidebar-inner { 
-          width: 360px; /* Fixed inner width to prevent squishing during animation */
-          height: 100%; 
-          display: flex; 
-          flex-direction: column; 
-          overflow-y: hidden; 
-          position: relative;
+        .gt-profile-sidebar-inner {
+          width: 380px; height: 100%;
+          display: flex; flex-direction: column;
+          overflow-y: auto; position: relative;
         }
 
+        /* ── TABLET ── */
         @media (max-width: 1024px) {
-          .gt-inbox-layout { padding: 12px; gap: 12px; }
-          .gt-profile-sidebar { position: absolute; right: -360px; height: calc(100% - 24px); z-index: 20; box-shadow: -10px 0 30px rgba(0,0,0,0.4); width: 360px; margin-left: 0 !important; }
-          .gt-profile-sidebar:not(.open) { right: -360px; opacity: 1; width: 360px; border-width: 1px; }
-          .gt-profile-sidebar.open { right: 12px; }
+          .gt-inbox-sidebar { width: 320px; min-width: 320px; }
+          .gt-profile-sidebar {
+            position: absolute; right: -380px; top: 0; height: 100%;
+            z-index: 30; box-shadow: -4px 0 20px var(--wa-shadow);
+            width: 380px !important; opacity: 1 !important;
+            border-width: 1px !important; pointer-events: all !important;
+            transition: right 0.3s cubic-bezier(0.4,0,0.2,1), opacity 0.3s;
+          }
+          .gt-profile-sidebar:not(.open) { right: -380px; }
+          .gt-profile-sidebar.open { right: 0; }
         }
-        
-        /* ─── MOBILE SMOOTH SLIDING BEHAVIOR ─── */
+
+        /* ── MOBILE ── */
         @media (max-width: 768px) {
-          .gt-inbox-layout { padding: 0; gap: 0; position: relative; overflow: hidden; }
-          .gt-inbox-sidebar, .gt-inbox-main, .gt-profile-sidebar { border-radius: 0; border: none; height: 100%; position: absolute; top: 0; left: 0; width: 100%; }
-          
-          /* The 3 layers on Mobile */
-          /* Layer 1: Sidebar (User List) */
-          .gt-inbox-sidebar { z-index: 10; transform: translateX(0); }
+          .gt-inbox-layout { padding: 0; position: relative; overflow: hidden; }
+          .gt-inbox-sidebar,
+          .gt-inbox-main,
+          .gt-profile-sidebar {
+            border-radius: 0; border: none; height: 100%;
+            position: absolute; top: 0; left: 0;
+            width: 100% !important; min-width: unset !important;
+          }
+          .gt-inbox-sidebar { z-index: 10; transform: translateX(0); transition: transform 0.3s cubic-bezier(0.4,0,0.2,1); }
           .gt-inbox-sidebar.mobile-hide { transform: translateX(-100%); }
-          
-          /* Layer 2: Main Chat Window */
-          .gt-inbox-main { z-index: 15; transform: translateX(100%); }
+          .gt-inbox-main { z-index: 15; transform: translateX(100%); transition: transform 0.3s cubic-bezier(0.4,0,0.2,1); }
           .gt-inbox-main.mobile-show { transform: translateX(0); }
-          
-          /* Layer 3: Profile Sidebar */
-          .gt-profile-sidebar { z-index: 20; transform: translateX(100%); width: 100% !important; right: auto !important; opacity: 1 !important; }
+          .gt-profile-sidebar {
+            z-index: 25; transform: translateX(100%); right: auto !important;
+            transition: transform 0.3s cubic-bezier(0.4,0,0.2,1);
+            opacity: 1 !important; pointer-events: all !important; width: 100% !important;
+          }
           .gt-profile-sidebar.open { transform: translateX(0); }
         }
-        
-        /* Overriding child component hardcoded colors for Light Theme */
-        .gt-inbox-wrapper * {
-          scrollbar-width: thin;
-          scrollbar-color: var(--inbox-border) transparent;
-        }
+
+        /* ── SCROLLBAR ── */
+        .gt-inbox-wrapper * { scrollbar-width: thin; scrollbar-color: var(--wa-divider) transparent; }
         .gt-inbox-wrapper ::-webkit-scrollbar { width: 6px; }
-        .gt-inbox-wrapper ::-webkit-scrollbar-thumb { background-color: var(--inbox-border); border-radius: 4px; }
+        .gt-inbox-wrapper ::-webkit-scrollbar-track { background: transparent; }
+        .gt-inbox-wrapper ::-webkit-scrollbar-thumb { background: var(--wa-divider); border-radius: 4px; }
+        .gt-inbox-wrapper ::-webkit-scrollbar-thumb:hover { background: var(--wa-text-muted); }
+
+        /* ── INPUT PLACEHOLDER COLOR ── */
+        .gt-inbox-wrapper input::placeholder { color: var(--wa-text-muted); }
+        .gt-inbox-wrapper textarea::placeholder { color: var(--wa-text-muted); }
       `}</style>
     </div>
   );

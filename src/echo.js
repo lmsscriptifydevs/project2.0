@@ -4,14 +4,7 @@ import axios from 'axios';
 
 window.Pusher = Pusher;
 
-const getBaseUrl = () => {
-  if (typeof window !== 'undefined') {
-    if (window.location.origin.includes('localhost') || window.location.origin.includes('127.0.0.1')) {
-      return window.location.origin.replace(':3000', ':8000');
-    }
-  }
-  return 'https://portal.grapetask.co';
-};
+const BASE_URL = 'https://portal.grapetask.co';
 
 const echo = new Echo({
     broadcaster: 'pusher',
@@ -22,7 +15,7 @@ const echo = new Echo({
         return {
             authorize: (socketId, callback) => {
                 const token = localStorage.getItem('accessToken');
-                axios.post(`${getBaseUrl()}/broadcasting/auth`, {
+                axios.post(`${BASE_URL}/broadcasting/auth`, {
                     socket_id: socketId,
                     channel_name: channel.name
                 }, {

@@ -108,13 +108,17 @@ function App() {
     }
   }, [dispatch, location.pathname]);
 
+  const showChatbot = !['inbox', 'chat'].some(keyword => 
+    location.pathname.toLowerCase().includes(keyword)
+  );
+
   return (
     <AppErrorBoundary>
       <ScrollToTop />
       <AppRoutes />
 
-      {/* 🤖 Chatbot Component Yahan Render Hoga */}
-      <Chatbot />
+      {/* 🤖 Chatbot Component (Hidden on Inbox & Chat pages) */}
+      {showChatbot && <Chatbot />}
 
     </AppErrorBoundary>
   );

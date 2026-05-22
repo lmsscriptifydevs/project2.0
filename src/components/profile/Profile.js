@@ -11,6 +11,7 @@ import { ToastContainer, toast } from "react-toastify";
 import "react-toastify/dist/ReactToastify.css";
 import { Spinner } from "reactstrap";
 import ConnectWindows from "../../assets/ConnectWindows.webp";
+import axios from "../../utils/axios";
 import {
   PrifileOtp,
   clearPhoneErrors,
@@ -19,7 +20,8 @@ import {
   profileUpdate,
   sendPhoneOTP,
   userProfile,
-  verifyPhoneOTP
+  verifyPhoneOTP,
+  getUserDetailsSuccess
 } from "../../redux/slices/profileSlice";
 import { useDispatch, useSelector } from "../../redux/store/store";
 import "../../style/profile.scss";
@@ -61,6 +63,16 @@ const ProfileUser = () => {
   const [zip, setZip] = useState("");
   const [value, setValue] = useState();
   const [professionalSummary, setProfessionalSummary] = useState("");
+  const [profileLevel, setProfileLevel] = useState("Intermediate");
+  const [profilePrimaryGoal, setProfilePrimaryGoal] = useState("Freelance");
+  const [profileOccupation, setProfileOccupation] = useState("");
+  const [profileBio, setProfileBio] = useState("");
+  const [profileWebsite, setProfileWebsite] = useState("");
+  const [profileSkills, setProfileSkills] = useState([]);
+  const [profileEducations, setProfileEducations] = useState([]);
+  const [skillInputText, setSkillInputText] = useState("");
+  const [isLoadingProfileData, setIsLoadingProfileData] = useState(false);
+  const [isSubmittingProfile, setIsSubmittingProfile] = useState(false);
   
   // Password states
   const [currentPas, setCurrentPas] = useState("");
@@ -93,36 +105,105 @@ const ProfileUser = () => {
     );
   };
 
+  const getCountryIso = (countryName) => {
+    if (!countryName) return "";
+    const found = Country.getAllCountries().find(
+      (c) => c.name.toLowerCase() === countryName.toLowerCase() || c.isoCode.toLowerCase() === countryName.toLowerCase()
+    );
+    return found ? found.isoCode : "";
+  };
+
+  const getStateIso = (countryIso, stateName) => {
+    if (!countryIso || !stateName) return "";
+    const statesList = State.getStatesOfCountry(countryIso);
+    const found = statesList.find(
+      (s) => s.name.toLowerCase() === stateName.toLowerCase() || s.isoCode.toLowerCase() === stateName.toLowerCase()
+    );
+    return found ? found.isoCode : "";
+  };
+
+  const getCountryName = (countryCode) => {
+    const found = Country.getAllCountries().find((c) => c.isoCode === countryCode);
+    return found ? found.name : countryCode;
+  };
+
+  const getStateName = (countryCode, stateCode) => {
+    const found = State.getStatesOfCountry(countryCode).find((s) => s.isoCode === stateCode);
+    return found ? found.name : stateCode;
+  };
+
+  const handleCountryChange = (selectedCountryIso) => {
+    setCountry(selectedCountryIso);
+    if (selectedCountryIso) {
+      setStates(State.getStatesOfCountry(selectedCountryIso));
+    } else {
+      setStates([]);
+    }
+    setState("");
+    setCities([]);
+    setCity("");
+  };
+
+  const handleStateChange = (selectedStateIso) => {
+    setState(selectedStateIso);
+    if (country && selectedStateIso) {
+      setCities(City.getCitiesOfState(country, selectedStateIso));
+    } else {
+      setCities([]);
+    }
+    setCity("");
+  };
+
   useEffect(() => {
     const countryData = Country.getAllCountries();
     setCountries(countryData);
+
+    setIsLoadingProfileData(true);
+    axios.get("/get-user-onboarding")
+      .then((res) => {
+        if (res.data && res.data.status && res.data.data) {
+          const data = res.data.data;
+          const profile = data.profile || {};
+          const extra = data.extra_details || {};
+          
+          setFirstName(profile.fname || "");
+          setLastName(profile.lname || "");
+          setValue(profile.phone || "");
+          setZip(profile.postalCode || "");
+          
+          const countryIso = getCountryIso(profile.country);
+          setCountry(countryIso);
+          
+          if (countryIso) {
+            const countryStates = State.getStatesOfCountry(countryIso);
+            setStates(countryStates);
+            
+            const stateIso = getStateIso(countryIso, profile.state);
+            setState(stateIso);
+            
+            if (stateIso) {
+              const stateCities = City.getCitiesOfState(countryIso, stateIso);
+              setCities(stateCities);
+              setCity(profile.city || "");
+            }
+          }
+          
+          setProfileLevel(profile.level || "Intermediate");
+          setProfileBio(profile.bio || "");
+          setProfilePrimaryGoal(extra.primary_goal || "Freelance");
+          setProfileOccupation(extra.occupation || "");
+          setProfileWebsite(extra.personal_website || "");
+          setProfileSkills(data.skills || []);
+          setProfileEducations(data.educations || []);
+        }
+      })
+      .catch((err) => {
+        console.error("Error fetching onboarding details:", err);
+      })
+      .finally(() => {
+        setIsLoadingProfileData(false);
+      });
   }, []);
-
-  useEffect(() => {
-    if (country) {
-      const countryStates = State.getStatesOfCountry(country);
-      setStates(countryStates);
-      setState("");
-      setCities([]);
-      setCity("");
-    } else {
-      setStates([]);
-      setCities([]);
-      setState("");
-      setCity("");
-    }
-  }, [country]);
-
-  useEffect(() => {
-    if (country && state) {
-      const stateCities = City.getCitiesOfState(country, state);
-      setCities(stateCities);
-      setCity("");
-    } else {
-      setCities([]);
-      setCity("");
-    }
-  }, [country, state]);
 
   useEffect(() => {
     const fetchProfile = () => {
@@ -138,38 +219,91 @@ const ProfileUser = () => {
   }, [dispatch]);
 
   useEffect(() => {
-    localStorage.setItem("UserData", JSON.stringify(userDetail));
-    setFirstName(userDetail?.fname || "");
-    setLastName(userDetail?.lname || "");
-    setCountry(userDetail?.country || "");
-    setCity(userDetail?.city || "");
-    setState(userDetail?.state || "");
-    setZip(userDetail?.postalCode || "");
-    setValue(userDetail?.phone || "");
-    setProfessionalSummary(userDetail?.professional_summary ?? "");
+    if (userDetail && Object.keys(userDetail).length > 0) {
+      localStorage.setItem("UserData", JSON.stringify(userDetail));
+    }
   }, [userDetail]);
 
-  const handleSubmit = (e) => {
-    e.preventDefault();
-    let data = {
-      fname: firstName,
-      lname: lastName,
-      phone: value,
-      country: country,
-      city: city,
-      state: state,
-      postalCode: zip,
-      professional_summary: professionalSummary || undefined,
-      device_token: "123456",
-    };
-    dispatch(profileUpdate(data, handleResponse));
+  const handleSkillKeyDown = (e) => {
+    if (e.key === 'Enter' && skillInputText.trim()) {
+      e.preventDefault();
+      const newSkill = skillInputText.trim();
+      if (!profileSkills.find(s => s.skill.toLowerCase() === newSkill.toLowerCase())) {
+        setProfileSkills([...profileSkills, { skill: newSkill, level: "Intermediate" }]);
+      }
+      setSkillInputText("");
+    }
   };
 
-  const handleResponse = (data) => {
-    if (data?.status) {
-      toast.success("Successfully Update Profile");
-    } else {
-      toast.error(data?.message || "Update failed");
+  const handleAddEducation = (e) => {
+    e.preventDefault();
+    setProfileEducations([...profileEducations, { institution: "", degree: "", passing_year: "" }]);
+  };
+
+  const handleRemoveEducation = (index) => {
+    setProfileEducations(profileEducations.filter((_, idx) => idx !== index));
+  };
+
+  const handleEducationChange = (index, key, value) => {
+    const updated = [...profileEducations];
+    updated[index][key] = value;
+    setProfileEducations(updated);
+  };
+
+  const handleSubmit = async (e) => {
+    e.preventDefault();
+    if (!firstName || !lastName) {
+      toast.error("First name and Last name are required.");
+      return;
+    }
+    
+    setIsSubmittingProfile(true);
+    try {
+      const payload = {
+        fname: firstName,
+        lname: lastName,
+        phone: value,
+        country: getCountryName(country),
+        state: getStateName(country, state),
+        city: city,
+        postalCode: zip,
+        level: profileLevel,
+        primary_goal: profilePrimaryGoal,
+        occupation: profileOccupation,
+        bio: profileBio,
+        personal_website: profileWebsite,
+        skills: profileSkills,
+        educations: profileEducations,
+        image: userDetail?.image || "",
+      };
+
+      const res = await axios.post("/submit-full-onboarding", payload);
+      if (res.data && res.data.status) {
+        const updatedUser = res.data.data;
+        
+        // Sync localStorage and Redux
+        const currentUserStr = localStorage.getItem("UserData");
+        const currentVal = currentUserStr ? JSON.parse(currentUserStr) : {};
+        const updated = { ...currentVal, ...updatedUser };
+        localStorage.setItem("UserData", JSON.stringify(updated));
+        window.dispatchEvent(new CustomEvent("userDataChanged", { detail: updated }));
+        
+        dispatch(getUserDetailsSuccess(updated));
+        toast.success("Successfully Updated Profile!");
+      } else {
+        toast.error(res.data?.message || "Failed to update profile.");
+      }
+    } catch (err) {
+      console.error("Error updating profile:", err);
+      const errors = err.response?.data?.errors;
+      if (errors) {
+        const firstErrorKey = Object.keys(errors)[0];
+        toast.error(errors[firstErrorKey][0]);
+      } else {
+        toast.error(err.response?.data?.message || "An error occurred while updating your profile.");
+      }
+    } finally {
+      setIsSubmittingProfile(false);
     }
   };
 
@@ -364,6 +498,84 @@ const ProfileUser = () => {
         }
         .btn-close { filter: invert(1) opacity(0.7); transition: 0.3s; }
         .btn-close:hover { filter: invert(1) opacity(1); transform: rotate(90deg); }
+
+        /* Dynamic Skills & Education Styles */
+        .skills-container {
+          display: flex;
+          flex-wrap: wrap;
+          gap: 8px;
+          margin-top: 12px;
+        }
+        .skill-tag {
+          display: inline-flex;
+          align-items: center;
+          gap: 6px;
+          padding: 6px 12px;
+          background-color: rgba(240, 89, 31, 0.15);
+          border: 1px solid rgba(240, 89, 31, 0.3);
+          border-radius: 20px;
+          color: #f0591f;
+          font-size: 13px;
+          font-weight: 600;
+        }
+        .skill-remove-btn {
+          background: none;
+          border: none;
+          color: #f0591f;
+          cursor: pointer;
+          font-size: 14px;
+          padding: 0;
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          opacity: 0.7;
+          transition: opacity 0.2s;
+        }
+        .skill-remove-btn:hover {
+          opacity: 1;
+        }
+        .education-card {
+          position: relative;
+          padding: 20px;
+          background-color: #0f172a;
+          border: 1px solid rgba(255, 255, 255, 0.08);
+          border-radius: 16px;
+          margin-bottom: 12px;
+        }
+        .education-delete-btn {
+          position: absolute;
+          top: 12px;
+          right: 12px;
+          background: none;
+          border: none;
+          color: #ef4444;
+          cursor: pointer;
+          font-size: 16px;
+          padding: 4px;
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          transition: opacity 0.2s;
+        }
+        .education-delete-btn:hover {
+          opacity: 0.8;
+        }
+        .btn-add-education {
+          width: 100%;
+          padding: 12px;
+          background: none;
+          border: 1px dashed rgba(240, 89, 31, 0.4);
+          border-radius: 12px;
+          color: #f0591f;
+          cursor: pointer;
+          font-size: 14px;
+          font-weight: 600;
+          transition: all 0.3s ease;
+        }
+        .btn-add-education:hover {
+          background: rgba(240, 89, 31, 0.05);
+          border-color: #f0591f;
+        }
       `}</style>
 
       <div className="container-fluid profileSetting poppins pt-5">
@@ -377,120 +589,276 @@ const ProfileUser = () => {
               
               {/* --- PROFILE TAB --- */}
               {tabState === "profile" && (
-                <form className="prof-fields" onSubmit={handleSubmit}>
+                <div>
                   <div className="d-flex align-items-center mb-5 pb-3" style={{ borderBottom: "1px solid rgba(255,255,255,0.05)" }}>
                     <h2 className="fw-bold mb-0" style={{ color: "#fff", letterSpacing: "-0.5px" }}>Edit Profile</h2>
                   </div>
-                  
-                  <div className="row">
-                    <div className="col-lg-6 col-md-6 col-12 mb-4">
-                      <label className="form-label">First Name</label>
-                      <input
-                        type="text"
-                        className="form-control p-3 font-15"
-                        placeholder="e.g. John"
-                        required
-                        value={firstName}
-                        onChange={(e) => setFirstName(e.target.value)}
-                      />
-                    </div>
-                    <div className="col-lg-6 col-md-6 col-12 mb-4">
-                      <label className="form-label">Last Name</label>
-                      <input
-                        type="text"
-                        className="form-control p-3 font-15"
-                        placeholder="e.g. Doe"
-                        required
-                        value={lastName}
-                        onChange={(e) => setLastName(e.target.value)}
-                      />
-                    </div>
-                    
-                    <div className="col-12 mb-4">
-                      <label className="form-label">Professional Summary</label>
-                      <textarea
-                        className="form-control p-3 font-15"
-                        rows={4}
-                        placeholder="Brief description of your skills and experience..."
-                        value={professionalSummary}
-                        onChange={(e) => setProfessionalSummary(e.target.value)}
-                      />
-                    </div>
 
-                    <div className="col-lg-6 col-md-6 col-12 mb-4">
-                      <label className="form-label">Phone Number</label>
-                      <PhoneInput
-                        value={value}
-                        international
-                        defaultCountry="PK"
-                        required
-                        onChange={setValue}
-                      />
+                  {isLoadingProfileData ? (
+                    <div style={{ textAlign: "center", padding: "50px 0" }}>
+                      <Spinner style={{ color: "#f0591f" }} />
+                      <p className="mt-3" style={{ color: "#94a3b8" }}>Loading profile details...</p>
                     </div>
-                    <div className="col-lg-6 col-md-6 col-12 mb-4">
-                      <label className="form-label">Country</label>
-                      <select
-                        className="form-select font-15 p-3"
-                        required
-                        value={country}
-                        onChange={(e) => setCountry(e.target.value)}
-                      >
-                        <option value="">Select Country</option>
-                        {countries.map((c) => (
-                          <option key={c.isoCode} value={c.isoCode}>{c.name}</option>
-                        ))}
-                      </select>
-                    </div>
-                    
-                    <div className="col-lg-6 col-md-6 col-12 mb-4">
-                      <label className="form-label">State / Province</label>
-                      <select
-                        className="form-select font-15 p-3"
-                        required
-                        value={state}
-                        onChange={(e) => setState(e.target.value)}
-                        disabled={!country}
-                      >
-                        <option value="">Select State</option>
-                        {states.map((s) => (
-                          <option key={s.isoCode} value={s.isoCode}>{s.name}</option>
-                        ))}
-                      </select>
-                    </div>
-                    <div className="col-lg-6 col-md-6 col-12 mb-4">
-                      <label className="form-label">City</label>
-                      <select
-                        className="form-select font-15 p-3"
-                        required
-                        value={city}
-                        onChange={(e) => setCity(e.target.value)}
-                        disabled={!state}
-                      >
-                        <option value="">Select City</option>
-                        {cities.map((c, i) => (
-                          <option key={i} value={c.name}>{c.name}</option>
-                        ))}
-                      </select>
-                    </div>
-                    
-                    <div className="col-lg-6 col-md-6 col-12 mb-5">
-                      <label className="form-label">Zip / Postal Code</label>
-                      <input
-                        type="text"
-                        className="form-control p-3 font-15"
-                        placeholder="e.g. 10001"
-                        required
-                        value={zip}
-                        onChange={(e) => setZip(e.target.value)}
-                      />
-                    </div>
-                    
-                    <div className="col-12 text-end pt-3" style={{ borderTop: "1px solid rgba(255,255,255,0.05)" }}>
-                      <Button type="button" className="btn-stepper-border me-3 px-4 py-3" onClick={() => window.location.reload()}>Discard Changes</Button>
-                      <Button type="submit" className="btn-stepper px-5 py-3">Save Profile</Button>
-                    </div>
-                  </div>
-                </form>
+                  ) : (
+                    <form className="prof-fields" onSubmit={handleSubmit}>
+                      <div className="row">
+                        <div className="col-lg-6 col-md-6 col-12 mb-4">
+                          <label className="form-label">First Name</label>
+                          <input
+                            type="text"
+                            className="form-control p-3 font-15"
+                            placeholder="e.g. John"
+                            required
+                            value={firstName}
+                            onChange={(e) => setFirstName(e.target.value)}
+                          />
+                        </div>
+                        <div className="col-lg-6 col-md-6 col-12 mb-4">
+                          <label className="form-label">Last Name</label>
+                          <input
+                            type="text"
+                            className="form-control p-3 font-15"
+                            placeholder="e.g. Doe"
+                            required
+                            value={lastName}
+                            onChange={(e) => setLastName(e.target.value)}
+                          />
+                        </div>
+
+                        <div className="col-lg-6 col-md-6 col-12 mb-4">
+                          <label className="form-label">Phone Number</label>
+                          <PhoneInput
+                            value={value}
+                            international
+                            defaultCountry="PK"
+                            required
+                            onChange={setValue}
+                          />
+                        </div>
+                        <div className="col-lg-6 col-md-6 col-12 mb-4">
+                          <label className="form-label">Country</label>
+                          <select
+                            className="form-select font-15 p-3"
+                            required
+                            value={country}
+                            onChange={(e) => handleCountryChange(e.target.value)}
+                          >
+                            <option value="">Select Country</option>
+                            {countries.map((c) => (
+                              <option key={c.isoCode} value={c.isoCode}>{c.name}</option>
+                            ))}
+                          </select>
+                        </div>
+                        
+                        <div className="col-lg-6 col-md-6 col-12 mb-4">
+                          <label className="form-label">State / Province</label>
+                          <select
+                            className="form-select font-15 p-3"
+                            required
+                            value={state}
+                            onChange={(e) => handleStateChange(e.target.value)}
+                            disabled={!country}
+                          >
+                            <option value="">Select State</option>
+                            {states.map((s) => (
+                              <option key={s.isoCode} value={s.isoCode}>{s.name}</option>
+                            ))}
+                          </select>
+                        </div>
+                        <div className="col-lg-6 col-md-6 col-12 mb-4">
+                          <label className="form-label">City</label>
+                          <select
+                            className="form-select font-15 p-3"
+                            required
+                            value={city}
+                            onChange={(e) => setCity(e.target.value)}
+                            disabled={!state}
+                          >
+                            <option value="">Select City</option>
+                            {cities.map((c, i) => (
+                              <option key={i} value={c.name}>{c.name}</option>
+                            ))}
+                          </select>
+                        </div>
+                        
+                        <div className="col-lg-6 col-md-6 col-12 mb-4">
+                          <label className="form-label">Zip / Postal Code</label>
+                          <input
+                            type="text"
+                            className="form-control p-3 font-15"
+                            placeholder="e.g. 10001"
+                            required
+                            value={zip}
+                            onChange={(e) => setZip(e.target.value)}
+                          />
+                        </div>
+
+                        {/* Professional Info (For Expert and BD roles) */}
+                        {(() => {
+                          const userRole = (userDetail?.role || localStorage.getItem("Role") || "client").toLowerCase();
+                          const isBd = userRole.includes("bd") || userRole.includes("business") || userRole.includes("bidder") || userRole.includes("middleman") || userRole.includes("representative");
+                          const isExpert = userRole.includes("expert") || userRole.includes("freelancer") || userRole.includes("developer") || userRole.includes("designer") || userRole.includes("consultant");
+                          if (isBd || isExpert) {
+                            return (
+                              <>
+                                <div className="col-lg-6 col-md-6 col-12 mb-4">
+                                  <label className="form-label">Experience Level</label>
+                                  <select 
+                                    value={profileLevel} 
+                                    onChange={e => setProfileLevel(e.target.value)}
+                                    className="form-select font-15 p-3"
+                                  >
+                                    <option value="Beginner">Beginner</option>
+                                    <option value="Intermediate">Intermediate</option>
+                                    <option value="Expert">Expert / Senior</option>
+                                  </select>
+                                </div>
+
+                                <div className="col-lg-6 col-md-6 col-12 mb-4">
+                                  <label className="form-label">Primary Goal</label>
+                                  <select 
+                                    value={profilePrimaryGoal} 
+                                    onChange={e => setProfilePrimaryGoal(e.target.value)}
+                                    className="form-select font-15 p-3"
+                                  >
+                                    <option value="Full-time">Full-time Income</option>
+                                    <option value="Freelance">Side Income</option>
+                                  </select>
+                                </div>
+
+                                <div className="col-12 mb-4">
+                                  <label className="form-label">Professional Headline</label>
+                                  <input 
+                                    type="text" 
+                                    value={profileOccupation}
+                                    onChange={e => setProfileOccupation(e.target.value)}
+                                    placeholder="e.g. Senior Frontend Developer | React Expert"
+                                    className="form-control p-3 font-15"
+                                  />
+                                </div>
+
+                                <div className="col-12 mb-4">
+                                  <label className="form-label">About You (Bio)</label>
+                                  <textarea 
+                                    value={profileBio}
+                                    onChange={e => setProfileBio(e.target.value)}
+                                    placeholder="Briefly describe your expertise..."
+                                    className="form-control p-3 font-15"
+                                    rows="4"
+                                    maxLength="500"
+                                  />
+                                  <div style={{ fontSize: "12px", textAlign: "right", marginTop: "4px", color: "#94a3b8" }}>
+                                    {profileBio.length} / 500
+                                  </div>
+                                </div>
+
+                                <div className="col-12 mb-4">
+                                  <label className="form-label">Portfolio / Website Link</label>
+                                  <input 
+                                    type="url" 
+                                    value={profileWebsite}
+                                    onChange={e => setProfileWebsite(e.target.value)}
+                                    placeholder="https://www.myportfolio.com"
+                                    className="form-control p-3 font-15"
+                                  />
+                                </div>
+
+                                {/* Skills */}
+                                <div className="col-12 mb-4">
+                                  <label className="form-label">Skills (Press Enter to Add)</label>
+                                  <input 
+                                    type="text" 
+                                    value={skillInputText}
+                                    onChange={e => setSkillInputText(e.target.value)}
+                                    onKeyDown={handleSkillKeyDown}
+                                    placeholder="Add skill and press Enter"
+                                    className="form-control p-3 font-15"
+                                  />
+                                  <div className="skills-container">
+                                    {profileSkills.map((s, idx) => (
+                                      <span key={idx} className="skill-tag">
+                                        {s.skill}
+                                        <button 
+                                          type="button" 
+                                          onClick={() => setProfileSkills(profileSkills.filter((_, i) => i !== idx))}
+                                          className="skill-remove-btn"
+                                        >
+                                          ×
+                                        </button>
+                                      </span>
+                                    ))}
+                                  </div>
+                                </div>
+
+                                {/* Educations */}
+                                <div className="col-12 mb-4">
+                                  <label className="form-label">Education History</label>
+                                  <div style={{ display: "flex", flexDirection: "column", gap: "12px" }}>
+                                    {profileEducations.map((edu, idx) => (
+                                      <div key={idx} className="education-card">
+                                        <button 
+                                          type="button" 
+                                          onClick={() => handleRemoveEducation(idx)}
+                                          className="education-delete-btn"
+                                          title="Delete Education"
+                                        >
+                                          🗑️
+                                        </button>
+                                        <div style={{ marginBottom: "12px" }}>
+                                          <input 
+                                            type="text" 
+                                            value={edu.institution}
+                                            onChange={e => handleEducationChange(idx, "institution", e.target.value)}
+                                            placeholder="School / University"
+                                            className="form-control p-3 font-14"
+                                            required
+                                          />
+                                        </div>
+                                        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "12px" }}>
+                                          <input 
+                                            type="text" 
+                                            value={edu.degree}
+                                            onChange={e => handleEducationChange(idx, "degree", e.target.value)}
+                                            placeholder="Degree (e.g. BSCS)"
+                                            className="form-control p-3 font-14"
+                                            required
+                                          />
+                                          <input 
+                                            type="text" 
+                                            value={edu.passing_year}
+                                            onChange={e => handleEducationChange(idx, "passing_year", e.target.value)}
+                                            placeholder="Graduation Year (e.g. 2026)"
+                                            className="form-control p-3 font-14"
+                                            required
+                                          />
+                                        </div>
+                                      </div>
+                                    ))}
+                                    <button 
+                                      type="button" 
+                                      onClick={handleAddEducation}
+                                      className="btn-add-education"
+                                    >
+                                      + Add Education
+                                    </button>
+                                  </div>
+                                </div>
+                              </>
+                            );
+                          }
+                          return null;
+                        })()}
+                        
+                        <div className="col-12 text-end pt-3 mt-4" style={{ borderTop: "1px solid rgba(255,255,255,0.05)" }}>
+                          <Button type="button" className="btn-stepper-border me-3 px-4 py-3" onClick={() => window.location.reload()}>Discard Changes</Button>
+                          <Button type="submit" disabled={isSubmittingProfile} className="btn-stepper px-5 py-3">
+                            {isSubmittingProfile ? <Spinner size="sm" /> : "Save Profile"}
+                          </Button>
+                        </div>
+                      </div>
+                    </form>
+                  )}
+                </div>
               )}
 
               {/* --- PASSWORD TAB --- */}
